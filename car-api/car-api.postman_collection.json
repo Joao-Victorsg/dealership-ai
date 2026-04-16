@@ -1,0 +1,383 @@
+{
+  "info": {
+    "name": "car-api — Dealership AI",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the Car Inventory API. Base URL targets LocalStack via the NLB DNS name.\n\nFor protected endpoints set the 'bearerToken' collection variable to a valid JWT."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://api-dealership-ai.elb.localhost.localstack.cloud:8080",
+      "type": "string",
+      "description": "NLB DNS name assigned by LocalStack"
+    },
+    {
+      "key": "bearerToken",
+      "value": "REPLACE_WITH_JWT",
+      "type": "string",
+      "description": "JWT bearer token for authenticated requests (ROLE_STAFF required for write operations)"
+    },
+    {
+      "key": "carId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a car, populated automatically by the 'Register a new car' request"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Boot Actuator health endpoint. No authentication required. Useful for verifying the service is reachable through the NLB."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cars",
+      "item": [
+        {
+          "name": "List cars (no filter)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars?page=0&size=20&sort=registrationDate,desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "registrationDate,desc" }
+              ]
+            },
+            "description": "Returns a paginated list of all cars. Public endpoint — no JWT required."
+          },
+          "response": []
+        },
+        {
+          "name": "List cars (filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars?manufacturer=Honda&category=SEDAN&status=AVAILABLE&isNew=true&minValue=10000&maxValue=80000&propulsionType=COMBUSTION&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"],
+              "query": [
+                { "key": "manufacturer", "value": "Honda", "description": "Filter by manufacturer (partial match)" },
+                { "key": "category", "value": "SEDAN", "description": "SUV | SEDAN | SPORT | HATCH | PICKUP" },
+                { "key": "status", "value": "AVAILABLE", "description": "AVAILABLE | SOLD | UNAVAILABLE" },
+                { "key": "isNew", "value": "true", "description": "true = new cars only" },
+                { "key": "minValue", "value": "10000", "description": "Minimum listed value" },
+                { "key": "maxValue", "value": "80000", "description": "Maximum listed value" },
+                { "key": "propulsionType", "value": "COMBUSTION", "description": "ELECTRIC | COMBUSTION" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "List cars using all available filter parameters. Adjust or disable individual query params as needed."
+          },
+          "response": []
+        },
+        {
+          "name": "Get car by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars/{{carId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars", "{{carId}}"]
+            },
+            "description": "Retrieve a single car by UUID. Public endpoint. Populate {{carId}} from the 'Register a new car' response or list a car first."
+          },
+          "response": []
+        },
+        {
+          "name": "Register a new car",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.id) {",
+                  "    pm.collectionVariables.set('carId', json.data.id);",
+                  "    console.log('carId set to:', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"Pearl White\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"1HGBH41JXMN109186\",\n  \"status\": \"AVAILABLE\",\n  \"optionalItems\": [\"Sunroof\", \"Heated Seats\", \"Backup Camera\"],\n  \"category\": \"SEDAN\",\n  \"kilometers\": 0,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 45000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Register a new car. Requires ROLE_STAFF JWT. The test script automatically sets {{carId}} from the response for use in subsequent requests.\n\nStatus cannot be SOLD on registration.\nNew cars must have kilometers = 0.\nUsed cars must have kilometers > 0.\nVIN must be exactly 17 alphanumeric characters."
+          },
+          "response": []
+        },
+        {
+          "name": "Register a used car",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.id) {",
+                  "    pm.collectionVariables.set('carId', json.data.id);",
+                  "    console.log('carId set to:', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Corolla\",\n  \"manufacturingYear\": 2021,\n  \"manufacturer\": \"Toyota\",\n  \"externalColor\": \"Silver\",\n  \"internalColor\": \"Beige\",\n  \"vin\": \"JTDBT923891234567\",\n  \"status\": \"AVAILABLE\",\n  \"optionalItems\": [\"Cruise Control\"],\n  \"category\": \"SEDAN\",\n  \"kilometers\": 35000,\n  \"isNew\": false,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 28500.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Register a used car with kilometers > 0."
+          },
+          "response": []
+        },
+        {
+          "name": "Update a car",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"UNAVAILABLE\",\n  \"listedValue\": 43500.00,\n  \"externalColor\": \"Midnight Blue\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars/{{carId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars", "{{carId}}"]
+            },
+            "description": "Partially update mutable car attributes: status, listedValue, externalColor, internalColor, optionalItems, imageKey. Requires ROLE_STAFF JWT. Cannot update a car that is SOLD."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Car Images",
+      "item": [
+        {
+          "name": "Generate presigned upload URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentType\": \"image/jpeg\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars/{{carId}}/image/presigned-url",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars", "{{carId}}", "image", "presigned-url"]
+            },
+            "description": "Generates a presigned S3 PUT URL for uploading a car image. Requires ROLE_STAFF JWT.\n\nSupported content types: image/jpeg, image/png, image/webp.\n\nafter getting the presigned URL, use 'Upload image to S3 (presigned PUT)' to upload the file directly to S3."
+          },
+          "response": []
+        },
+        {
+          "name": "Upload image to S3 (presigned PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "image/jpeg" }
+            ],
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": ""
+              }
+            },
+            "url": {
+              "raw": "PASTE_PRESIGNED_URL_HERE",
+              "host": ["PASTE_PRESIGNED_URL_HERE"]
+            },
+            "description": "Upload an image file directly to S3 using the presigned URL returned by the previous request. Set the URL to the presigned URL value and the Content-Type header must match the one used when generating the URL. No Authorization header needed — the credentials are embedded in the presigned URL."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation Errors (negative tests)",
+      "item": [
+        {
+          "name": "[422] Register car — SOLD status",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"Red\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"1HGBH41JXMN109999\",\n  \"status\": \"SOLD\",\n  \"category\": \"SEDAN\",\n  \"kilometers\": 0,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 45000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Should return 400 — initial status cannot be SOLD."
+          },
+          "response": []
+        },
+        {
+          "name": "[400] Register car — new car with kilometers > 0",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"Blue\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"1HGBH41JXMN199999\",\n  \"status\": \"AVAILABLE\",\n  \"category\": \"SEDAN\",\n  \"kilometers\": 500,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 45000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Should return 400 — a new car cannot have kilometers > 0."
+          },
+          "response": []
+        },
+        {
+          "name": "[400] Register car — invalid VIN (< 17 chars)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"Green\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"SHORT\",\n  \"status\": \"AVAILABLE\",\n  \"category\": \"SEDAN\",\n  \"kilometers\": 0,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 45000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Should return 400 — VIN must be exactly 17 alphanumeric characters."
+          },
+          "response": []
+        },
+        {
+          "name": "[409] Register car — duplicate VIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic Copy\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"Black\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"1HGBH41JXMN109186\",\n  \"status\": \"AVAILABLE\",\n  \"category\": \"SEDAN\",\n  \"kilometers\": 0,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 50000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Run 'Register a new car' first (same VIN 1HGBH41JXMN109186). Should return 409 — duplicate VIN."
+          },
+          "response": []
+        },
+        {
+          "name": "[404] Get non-existent car",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Should return 404 — car does not exist."
+          },
+          "response": []
+        },
+        {
+          "name": "[401] Register car — no token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model\": \"Civic\",\n  \"manufacturingYear\": 2024,\n  \"manufacturer\": \"Honda\",\n  \"externalColor\": \"White\",\n  \"internalColor\": \"Black\",\n  \"vin\": \"1HGBH41JXMN100001\",\n  \"status\": \"AVAILABLE\",\n  \"category\": \"SEDAN\",\n  \"kilometers\": 0,\n  \"isNew\": true,\n  \"propulsionType\": \"COMBUSTION\",\n  \"listedValue\": 45000.00\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/cars",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "cars"]
+            },
+            "description": "Should return 401 — no bearer token provided."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
