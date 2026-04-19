@@ -265,12 +265,11 @@
                         <param>br.com.dealership.car.api.CarApiApplication</param>
                         <param>br.com.dealership.car.api.config.SecurityConfig</param>
                         <param>br.com.dealership.car.api.config.OpenApiConfig</param>
-                        <param>br.com.dealership.car.api.config.CacheConfig</param>
+                        <param>br.com.dealership.car.api.config.RedisConfig</param>
                         <param>br.com.dealership.car.api.config.S3Config</param>
                     </excludedClasses>
                     <excludedTestClasses>
                         <param>integrated.**</param>
-                        <param>br.com.dealership.car.api.CarApiApplicationTests</param>
                     </excludedTestClasses>
                     <mutationThreshold>90</mutationThreshold>
                     <coverageThreshold>90</coverageThreshold>

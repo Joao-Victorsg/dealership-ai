@@ -14,7 +14,7 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 @Configuration
 @EnableCaching
-public class CacheConfig {
+public class RedisConfig {
 
     private static final Duration CAR_BY_ID_TTL = Duration.ofHours(24);
     private static final Duration CAR_LISTINGS_TTL = Duration.ofMinutes(10);
