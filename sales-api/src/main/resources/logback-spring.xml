@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <springProperty scope="context" name="springAppName" source="spring.application.name"/>
+
+    <!-- ══════════════════════════════════════════════════════
+         JSON appender — used in all non-local environments.
+         New Relic Infrastructure agent / log forwarder reads
+         structured JSON from stdout.
+         ══════════════════════════════════════════════════════ -->
+    <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- Adds "app":"sales-api" to every log line -->
+            <customFields>{"app":"${springAppName}"}</customFields>
+            <!-- New Relic parses "timestamp" (epoch ms) natively -->
+            <timestampPattern>unix_milliseconds</timestampPattern>
+            <fieldNames>
+                <timestamp>timestamp</timestamp>
+                <version>[ignore]</version>
+            </fieldNames>
+        </encoder>
+    </appender>
+
+    <!-- ══════════════════════════════════════════════════════
+         Plain-text appender — local development only.
+         ══════════════════════════════════════════════════════ -->
+    <appender name="CONSOLE_PLAIN" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Suppress noisy resilience4j internal library logs -->
+    <logger name="io.github.resilience4j" level="WARN"/>
+
+    <!-- ══════════════════════════════════════════════════════
+         Root logger — profile-switched
+         ══════════════════════════════════════════════════════ -->
+    <springProfile name="local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_PLAIN"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="!local">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+        </root>
+    </springProfile>
+
+</configuration>
+
