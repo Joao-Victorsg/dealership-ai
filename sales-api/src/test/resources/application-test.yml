@@ -1,0 +1,5 @@
+management:
+  newrelic:
+    metrics:
+      export:
+        enabled: false
