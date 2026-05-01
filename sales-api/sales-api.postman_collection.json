@@ -1,0 +1,329 @@
+{
+  "info": {
+    "name": "sales-api — Dealership AI",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the Sales API. Base URL targets LocalStack via the NLB DNS name.\n\nSet 'bearerToken' to a valid JWT before calling protected endpoints.\n- ROLE_CLIENT        → register a sale, list own sales, get sale by ID\n- ROLE_STAFF / ADMIN → staff sales listing and get by ID"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://api-dealership-ai.elb.localhost.localstack.cloud:8082",
+      "type": "string",
+      "description": "NLB DNS name + port assigned by LocalStack"
+    },
+    {
+      "key": "bearerToken",
+      "value": "REPLACE_WITH_JWT",
+      "type": "string",
+      "description": "JWT bearer token for authenticated requests"
+    },
+    {
+      "key": "saleId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a sale, populated automatically by the 'Register a sale' request"
+    },
+    {
+      "key": "carId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of the car being sold — populate from the car-api collection"
+    },
+    {
+      "key": "clientId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of the purchasing client — populate from the client-api collection"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Boot Actuator health endpoint. No authentication required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sales — Client",
+      "item": [
+        {
+          "name": "Register a sale",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.id) {",
+                  "    pm.collectionVariables.set('saleId', json.data.id);",
+                  "    console.log('saleId set to:', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"clientId\": \"{{clientId}}\",\n  \"clientSnapshot\": {\n    \"firstName\": \"João\",\n    \"lastName\": \"Silva\",\n    \"cpf\": \"52998224725\",\n    \"email\": \"joao.silva@example.com\",\n    \"address\": {\n      \"street\": \"Avenida Paulista\",\n      \"number\": \"100\",\n      \"complement\": \"Apto 42\",\n      \"neighborhood\": \"Bela Vista\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postcode\": \"01310-100\"\n    }\n  },\n  \"carSnapshot\": {\n    \"model\": \"Civic\",\n    \"manufacturer\": \"Honda\",\n    \"externalColor\": \"Pearl White\",\n    \"internalColor\": \"Black\",\n    \"manufacturingYear\": 2024,\n    \"optionalItems\": [\"Sunroof\", \"Heated Seats\"],\n    \"type\": \"COMBUSTION\",\n    \"category\": \"SEDAN\",\n    \"vin\": \"1HGBH41JXMN109186\",\n    \"listedValue\": 45000.00,\n    \"status\": \"AVAILABLE\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"]
+            },
+            "description": "Registers a new sale. Requires ROLE_CLIENT JWT.\n\nBoth the car and the client snapshots must be provided. The snapshots are stored as audit records at the time of purchase. The test script automatically sets {{saleId}} from the response for subsequent requests.\n\nSet {{carId}} and {{clientId}} from the car-api / client-api collections first."
+          },
+          "response": []
+        },
+        {
+          "name": "List my sales (no filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales?page=0&size=20&sort=saleDate,desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "saleDate,desc" }
+              ]
+            },
+            "description": "Returns a paginated list of sales for the authenticated client (identified by the JWT subject). Requires ROLE_CLIENT."
+          },
+          "response": []
+        },
+        {
+          "name": "List my sales (date range filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales?from=2024-01-01T00:00:00Z&to=2024-12-31T23:59:59Z&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"],
+              "query": [
+                { "key": "from", "value": "2024-01-01T00:00:00Z", "description": "ISO-8601 instant — start of range (inclusive)" },
+                { "key": "to", "value": "2024-12-31T23:59:59Z", "description": "ISO-8601 instant — end of range (inclusive)" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "List own sales filtered by a date range. Requires ROLE_CLIENT."
+          },
+          "response": []
+        },
+        {
+          "name": "Get sale by ID (client)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/{{saleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "{{saleId}}"]
+            },
+            "description": "Retrieves a single sale by UUID. Clients may only fetch their own sales. Requires ROLE_CLIENT (or ROLE_STAFF / ROLE_ADMIN for cross-client access)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Sales — Staff / Admin",
+      "item": [
+        {
+          "name": "List all sales (staff view, no filter)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/staff?page=0&size=20&sort=saleDate,desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "staff"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sort", "value": "saleDate,desc" }
+              ]
+            },
+            "description": "Returns a paginated list of all sales across all clients. Requires ROLE_STAFF or ROLE_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "List all sales (staff view, with filters)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/staff?clientId={{clientId}}&carId={{carId}}&from=2024-01-01T00:00:00Z&to=2024-12-31T23:59:59Z&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "staff"],
+              "query": [
+                { "key": "clientId", "value": "{{clientId}}", "description": "Filter by client UUID" },
+                { "key": "carId", "value": "{{carId}}", "description": "Filter by car UUID" },
+                { "key": "from", "value": "2024-01-01T00:00:00Z", "description": "ISO-8601 instant — start of range" },
+                { "key": "to", "value": "2024-12-31T23:59:59Z", "description": "ISO-8601 instant — end of range" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "List sales using all available staff filters. Requires ROLE_STAFF or ROLE_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "Get sale by ID (staff)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/{{saleId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "{{saleId}}"]
+            },
+            "description": "Retrieves any sale by UUID. Requires ROLE_STAFF or ROLE_ADMIN."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation Errors (negative tests)",
+      "item": [
+        {
+          "name": "[400] Register — missing carSnapshot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"clientId\": \"{{clientId}}\",\n  \"clientSnapshot\": {\n    \"firstName\": \"João\",\n    \"lastName\": \"Silva\",\n    \"cpf\": \"52998224725\",\n    \"email\": \"joao.silva@example.com\",\n    \"address\": {\n      \"street\": \"Rua Exemplo\",\n      \"number\": \"1\",\n      \"neighborhood\": \"Centro\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postcode\": \"01310-100\"\n    }\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"]
+            },
+            "description": "Should return 400 — carSnapshot is required."
+          },
+          "response": []
+        },
+        {
+          "name": "[400] Register — carId equals clientId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"00000000-0000-0000-0000-000000000001\",\n  \"clientId\": \"00000000-0000-0000-0000-000000000001\",\n  \"clientSnapshot\": {\n    \"firstName\": \"Test\",\n    \"lastName\": \"User\",\n    \"cpf\": \"52998224725\",\n    \"email\": \"test@example.com\",\n    \"address\": {\n      \"street\": \"Rua Exemplo\",\n      \"number\": \"1\",\n      \"neighborhood\": \"Centro\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"postcode\": \"01310-100\"\n    }\n  },\n  \"carSnapshot\": {\n    \"model\": \"Civic\",\n    \"manufacturer\": \"Honda\",\n    \"externalColor\": \"White\",\n    \"internalColor\": \"Black\",\n    \"manufacturingYear\": 2024,\n    \"type\": \"COMBUSTION\",\n    \"category\": \"SEDAN\",\n    \"vin\": \"1HGBH41JXMN109186\",\n    \"listedValue\": 45000.00,\n    \"status\": \"AVAILABLE\"\n  }\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"]
+            },
+            "description": "Should return 400 — carId and clientId must not be equal."
+          },
+          "response": []
+        },
+        {
+          "name": "[401] Register — no token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\",\n  \"clientId\": \"{{clientId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales"]
+            },
+            "description": "Should return 401 — no bearer token provided."
+          },
+          "response": []
+        },
+        {
+          "name": "[403] List staff sales — wrong role (CLIENT)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/staff",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "staff"]
+            },
+            "description": "Use a CLIENT JWT. Should return 403 — staff endpoint requires ROLE_STAFF or ROLE_ADMIN."
+          },
+          "response": []
+        },
+        {
+          "name": "[404] Get non-existent sale",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/sales/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "sales", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Should return 404 — sale does not exist."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
