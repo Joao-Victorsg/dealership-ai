@@ -1,0 +1,84 @@
+services:
+
+  localstack-ai:
+    container_name: "aws-dealership-ai"
+    image: localstack/localstack-pro:4.14.0
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+      - "127.0.0.1:443:443"              # LocalStack HTTPS Gateway (Pro)
+    environment:
+      - DEBUG=1
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
+      - NEPTUNE_USE_SSL=1
+      - PERSISTENCE=1
+      - ECS_REMOVE_CONTAINERS=0
+      - GATEWAY_LISTEN=0.0.0.0:4566,0.0.0.0:8085,0.0.0.0:8086,0.0.0.0:8087
+      - SMTP_HOST=smtp4dev
+      - SMTP_PORT=25
+      - SMTP_USERNAME=
+      - SMTP_PASSWORD=
+      - SMTP_EMAIL=noreply@example.com
+      - DNS_ADDRESS=0.0.0.0
+    volumes:
+      - "./localstack/localstack-init.sh:/etc/localstack/init/ready.d/localstack-init.sh"
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - dealership-ai-network
+
+  smtp4dev-ai:
+    container_name: smtp4dev-ai
+    image: rnwood/smtp4dev:v3
+    restart: always
+    ports:
+      # Change the number before : to the port the web interface should be accessible on
+      - '5000:80'
+      # Change the number before : to the port the SMTP server should be accessible on
+      - '25:25'
+      # Change the number before : to the port the IMAP server should be accessible on
+      - '143:143'
+    volumes:
+      # This is where smtp4dev stores the database..
+      - smtp4dev-ai-data:/smtp4dev
+    environment:
+      # Uncomment to customise these settings
+      # This is not a complete list of the available settings.
+      # See the documentation in appsettings.json for a full list.
+
+      #Specifies the virtual path from web server root where SMTP4DEV web interface will be hosted. e.g. "/" or "/smtp4dev"
+      #- ServerOptions__BasePath=/smtp4dev
+
+      #Specifies the URLs the web UI will use inside the container.
+      - ServerOptions__Urls=http://*:80
+
+      #Specifies the server hostname. Used in auto-generated TLS certificate if enabled.
+      - ServerOptions__HostName=smtp4dev
+    networks:
+      - dealership-ai-network
+  newrelic-infra:
+    container_name: newrelic-infra-ai
+    image: newrelic/infrastructure:latest
+    network_mode: host
+    cap_add:
+      - SYS_PTRACE
+    privileged: true
+    pid: host
+    environment:
+      - NRIA_LICENSE_KEY=${NEW_RELIC_LICENSE_KEY}
+      - NRIA_DISPLAY_NAME=dealership-ai-local
+    volumes:
+      - "/:/host:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./newrelic-infra.yml:/etc/newrelic-infra.yml"
+    restart: unless-stopped
+
+volumes:
+  cache:
+  smtp4dev-ai-data:
+    driver: local
+
+networks:
+  dealership-ai-network:
+    driver: bridge

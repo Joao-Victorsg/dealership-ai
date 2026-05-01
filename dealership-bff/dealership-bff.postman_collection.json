@@ -1,0 +1,435 @@
+{
+  "info": {
+    "name": "dealership-bff — Dealership AI",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the Dealership BFF. Base URL points to the API Gateway V2 invoke URL (LocalStack) or directly to the NLB when running docker compose.\n\nTypical flow:\n1. POST /api/v1/auth/register — create an account\n2. POST /api/v1/auth/login   — obtain {{accessToken}}\n3. Browse inventory, purchase a car, view profile/history\n\nThe 'accessToken' variable is populated automatically by the Login request."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://api-dealership-ai.elb.localhost.localstack.cloud:8083",
+      "type": "string",
+      "description": "NLB DNS name for LocalStack (port 8083). Replace with the API Gateway V2 invoke URL (e.g. http://<api-id>.execute-api.localhost.localstack.cloud:4566) when the full LocalStack deployment is running."
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token populated automatically by the Login request"
+    },
+    {
+      "key": "carId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a car from the inventory — set manually or from the car-api collection"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Boot Actuator health endpoint. No authentication required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register a new user",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"joao.silva@example.com\",\n  \"password\": \"Str0ng@Pass\",\n  \"firstName\": \"João\",\n  \"lastName\": \"Silva\",\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Creates a Keycloak account and the corresponding client profile in client-api. Returns 201 on success.\n\nPassword must be at least 8 characters. CPF must be a valid Brazilian CPF."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "    console.log('accessToken updated');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"joao.silva@example.com\",\n  \"password\": \"Str0ng@Pass\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Authenticates the user against Keycloak. Returns an access token in the response body and a refresh token in an HttpOnly cookie.\n\nThe test script sets {{accessToken}} automatically for use in subsequent requests."
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh access token",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Issues a new access token using the refresh token stored in the 'refresh_token' HttpOnly cookie set by Login. Postman automatically sends the cookie if it was received in the same collection. Returns 401 if no cookie is present."
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "logout"]
+            },
+            "description": "Revokes the refresh token and clears the HttpOnly cookie. Returns 204 on success."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Inventory",
+      "item": [
+        {
+          "name": "List inventory (no filter)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/inventory?page=0&size=20&sortBy=registrationDate&sortDirection=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "inventory"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "sortBy", "value": "registrationDate" },
+                { "key": "sortDirection", "value": "desc" }
+              ]
+            },
+            "description": "Returns a paginated list of available cars. Public endpoint — no authentication required."
+          },
+          "response": []
+        },
+        {
+          "name": "List inventory (with filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/inventory?q=Civic&manufacturer=Honda&category=SEDAN&condition=new&yearMin=2020&yearMax=2025&priceMin=30000&priceMax=80000&sortBy=listedValue&sortDirection=asc&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "inventory"],
+              "query": [
+                { "key": "q", "value": "Civic", "description": "Free-text search term" },
+                { "key": "manufacturer", "value": "Honda", "description": "Filter by manufacturer" },
+                { "key": "category", "value": "SEDAN", "description": "SUV | SEDAN | SPORT | HATCH | PICKUP" },
+                { "key": "condition", "value": "new", "description": "new | used" },
+                { "key": "yearMin", "value": "2020", "description": "Minimum manufacturing year" },
+                { "key": "yearMax", "value": "2025", "description": "Maximum manufacturing year" },
+                { "key": "priceMin", "value": "30000", "description": "Minimum listed value" },
+                { "key": "priceMax", "value": "80000", "description": "Maximum listed value" },
+                { "key": "sortBy", "value": "listedValue", "description": "Field to sort by" },
+                { "key": "sortDirection", "value": "asc", "description": "asc | desc" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "List inventory using all available filters. Public endpoint."
+          },
+          "response": []
+        },
+        {
+          "name": "Get car by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/inventory/{{carId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "inventory", "{{carId}}"]
+            },
+            "description": "Retrieves a single car from the inventory by UUID. Public endpoint. Set {{carId}} from the car-api collection or the list response."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Purchases",
+      "item": [
+        {
+          "name": "Initiate a purchase",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchases"]
+            },
+            "description": "Initiates a car purchase for the authenticated client. The BFF orchestrates calls to client-api, car-api and sales-api. Requires ROLE_CLIENT JWT.\n\nSet {{carId}} from the inventory listing first. Returns 201 with the purchase details on success."
+          },
+          "response": []
+        },
+        {
+          "name": "Get purchase history",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchases?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchases"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Returns the purchase history for the authenticated client. Requires ROLE_CLIENT JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "Get purchase history (date range)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchases?page=0&size=20&from=2024-01-01T00:00:00Z&to=2024-12-31T23:59:59Z",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchases"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "from", "value": "2024-01-01T00:00:00Z", "description": "ISO-8601 instant" },
+                { "key": "to", "value": "2024-12-31T23:59:59Z", "description": "ISO-8601 instant" }
+              ]
+            },
+            "description": "Returns purchase history filtered by date range. Requires ROLE_CLIENT JWT."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profile"]
+            },
+            "description": "Returns the profile of the authenticated user, aggregating data from client-api. Requires ROLE_CLIENT JWT."
+          },
+          "response": []
+        },
+        {
+          "name": "Update my profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"João Carlos\",\n  \"lastName\": \"Silva\",\n  \"phone\": \"+55 (11) 99876-5432\",\n  \"cep\": \"04538-133\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "profile"]
+            },
+            "description": "Updates the authenticated user's profile. Delegates to client-api. Requires ROLE_CLIENT JWT. All fields are optional — at least one must be provided."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation Errors (negative tests)",
+      "item": [
+        {
+          "name": "[400] Register — password too short",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"abc\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Should return 400 — password must be at least 8 characters."
+          },
+          "response": []
+        },
+        {
+          "name": "[400] Login — invalid email format",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"Str0ng@Pass\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Should return 400 — email must be a valid email address."
+          },
+          "response": []
+        },
+        {
+          "name": "[400] Purchase — missing carId",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchases"]
+            },
+            "description": "Should return 400 — carId is required."
+          },
+          "response": []
+        },
+        {
+          "name": "[401] Purchase — no token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"carId\": \"{{carId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/purchases",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "purchases"]
+            },
+            "description": "Should return 401 — no bearer token provided."
+          },
+          "response": []
+        },
+        {
+          "name": "[404] Get non-existent car from inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/inventory/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "inventory", "00000000-0000-0000-0000-000000000000"]
+            },
+            "description": "Should return 404 — car does not exist in the inventory."
+          },
+          "response": []
+        },
+        {
+          "name": "[401] Refresh — no cookie",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Call without a prior login (no refresh_token cookie). Should return 401."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+# Build outputs
+target/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Specs and docs (not needed in image)
+specs/
+
+# Maven wrapper source (already copied selectively in Dockerfile)
+# Nothing here — .mvn/ is copied explicitly
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Environment files
+*.env
+.env*
