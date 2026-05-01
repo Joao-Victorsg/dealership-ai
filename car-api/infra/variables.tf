@@ -50,7 +50,7 @@ variable "redis_port" {
 variable "jwt_issuer_uri" {
   description = "OAuth2 JWT issuer URI (spring.security.oauth2.resourceserver.jwt.issuer-uri)"
   type        = string
-  default     = "https://idp.example.com/realms/dealership"
+  default     = "http://keycloak:8080/realms/dealership"
 }
 
 variable "s3_bucket" {

@@ -19,7 +19,7 @@ resource "aws_ecs_task_definition" "car_api" {
   container_definitions = jsonencode([
     {
       name      = "car-api"
-      image     = "joaovictorsg/car-api-dealership:${var.image_tag}"
+      image     = "000000000000.dkr.ecr.us-east-1.localhost.localstack.cloud:4566/joaovictorsg/car-api-dealership:${var.image_tag}"
       cpu       = 1024
       memory    = 2048
       essential = true
