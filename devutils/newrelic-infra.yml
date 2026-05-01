@@ -1,0 +1,10 @@
+# New Relic Infrastructure agent configuration
+# https://docs.newrelic.com/docs/infrastructure/install-infrastructure-agent/configuration/infrastructure-agent-configuration-settings/
+
+# License key is injected via the NRIA_LICENSE_KEY environment variable in docker-compose.yml
+
+display_name: dealership-ai-local
+
+# Enable Docker container monitoring
+features:
+  docker_enabled: true
