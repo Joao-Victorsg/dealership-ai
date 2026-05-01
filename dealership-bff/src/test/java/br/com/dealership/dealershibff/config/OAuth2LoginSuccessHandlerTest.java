@@ -15,6 +15,7 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 import java.io.IOException;
@@ -47,12 +48,13 @@ class OAuth2LoginSuccessHandlerTest {
     private OAuth2User oauthUser;
 
     private static final String POST_LOGIN_URI = "http://localhost:3000";
+    private static final String POST_REGISTRATION_URI = "http://localhost:3000/register/complete";
 
     private OAuth2LoginSuccessHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new OAuth2LoginSuccessHandler(clientService, POST_LOGIN_URI);
+        handler = new OAuth2LoginSuccessHandler(clientService, POST_LOGIN_URI, POST_REGISTRATION_URI);
     }
 
     @Test
@@ -96,7 +98,7 @@ class OAuth2LoginSuccessHandlerTest {
 
         handler.onAuthenticationSuccess(request, response, auth);
 
-        verify(session).setAttribute(eq(SESSION_ID_TOKEN), eq("id-token-value"));
+        verify(session).setAttribute(SESSION_ID_TOKEN, "id-token-value");
     }
 
     @Test
@@ -125,5 +127,56 @@ class OAuth2LoginSuccessHandlerTest {
 
         verify(session, never()).setAttribute(any(), any());
         verify(response).sendRedirect(POST_LOGIN_URI);
+    }
+
+    @Test
+    void shouldSkipIdTokenWhenOidcUserHasNullIdToken() throws IOException {
+        final Instant expiresAt = Instant.now().plusSeconds(3600);
+        when(request.getSession()).thenReturn(session);
+        when(accessToken.getTokenValue()).thenReturn("access-token");
+        when(accessToken.getExpiresAt()).thenReturn(expiresAt);
+        when(authorizedClient.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClient.getRefreshToken()).thenReturn(null);
+
+        final OidcUser oidcUser = mock(OidcUser.class);
+        when(oidcUser.getName()).thenReturn("sub-123");
+        when(oidcUser.getIdToken()).thenReturn(null);
+        when(clientService.loadAuthorizedClient("keycloak", "sub-123")).thenReturn(authorizedClient);
+
+        final var auth = new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        verify(session, never()).setAttribute(eq(SESSION_ID_TOKEN), any());
+        verify(response).sendRedirect(POST_LOGIN_URI);
+    }
+
+    @Test
+    void shouldRedirectToRegistrationUriWhenRegistrationFlow() throws IOException {
+        final Instant expiresAt = Instant.now().plusSeconds(3600);
+        when(request.getSession()).thenReturn(session);
+        when(accessToken.getTokenValue()).thenReturn("access-token-value");
+        when(accessToken.getExpiresAt()).thenReturn(expiresAt);
+        when(authorizedClient.getAccessToken()).thenReturn(accessToken);
+        when(authorizedClient.getRefreshToken()).thenReturn(null);
+        when(oauthUser.getName()).thenReturn("sub-123");
+        when(clientService.loadAuthorizedClient("keycloak-register", "sub-123")).thenReturn(authorizedClient);
+
+        final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak-register");
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        verify(session).setAttribute(SESSION_ACCESS_TOKEN, "access-token-value");
+        verify(response).sendRedirect(POST_REGISTRATION_URI);
+    }
+
+    @Test
+    void shouldRedirectToRegistrationUriWhenAuthorizedClientIsNullInRegistrationFlow() throws IOException {
+        when(oauthUser.getName()).thenReturn("sub-123");
+        when(clientService.loadAuthorizedClient("keycloak-register", "sub-123")).thenReturn(null);
+
+        final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak-register");
+        handler.onAuthenticationSuccess(request, response, auth);
+
+        verify(session, never()).setAttribute(any(), any());
+        verify(response).sendRedirect(POST_REGISTRATION_URI);
     }
 }

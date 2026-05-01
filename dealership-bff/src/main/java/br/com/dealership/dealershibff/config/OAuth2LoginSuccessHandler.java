@@ -22,14 +22,19 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     public static final String SESSION_ID_TOKEN = "bff.id_token";
     public static final String SESSION_TOKEN_EXPIRY = "bff.token_expiry";
 
+    private static final String REGISTRATION_FLOW_ID = "keycloak-register";
+
     private final OAuth2AuthorizedClientService clientService;
     private final String postLoginRedirectUri;
+    private final String postRegistrationRedirectUri;
 
     public OAuth2LoginSuccessHandler(
             final OAuth2AuthorizedClientService clientService,
-            @Value("${app.post-login-redirect-uri}") final String postLoginRedirectUri) {
+            @Value("${app.post-login-redirect-uri}") final String postLoginRedirectUri,
+            @Value("${app.post-registration-redirect-uri}") final String postRegistrationRedirectUri) {
         this.clientService = clientService;
         this.postLoginRedirectUri = postLoginRedirectUri;
+        this.postRegistrationRedirectUri = postRegistrationRedirectUri;
     }
 
     @Override
@@ -39,12 +44,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             final Authentication authentication) throws IOException {
 
         final var oauthToken = (OAuth2AuthenticationToken) authentication;
+        final boolean isRegistrationFlow = REGISTRATION_FLOW_ID.equals(
+                oauthToken.getAuthorizedClientRegistrationId());
+
         final OAuth2AuthorizedClient client = clientService.loadAuthorizedClient(
                 oauthToken.getAuthorizedClientRegistrationId(),
                 oauthToken.getName());
 
         if (client == null) {
-            response.sendRedirect(postLoginRedirectUri);
+            response.sendRedirect(isRegistrationFlow ? postRegistrationRedirectUri : postLoginRedirectUri);
             return;
         }
 
@@ -61,6 +69,6 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             session.setAttribute(SESSION_ID_TOKEN, oidcUser.getIdToken().getTokenValue());
         }
 
-        response.sendRedirect(postLoginRedirectUri);
+        response.sendRedirect(isRegistrationFlow ? postRegistrationRedirectUri : postLoginRedirectUri);
     }
 }

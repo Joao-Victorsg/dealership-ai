@@ -43,13 +43,12 @@ public class SecurityConfig {
             final HttpSecurity http,
             final OAuth2LoginSuccessHandler oauth2LoginSuccessHandler,
             final SessionTokenInjectionFilter sessionTokenInjectionFilter,
-            final ClientRegistrationRepository clientRegistrationRepository) throws Exception {
+            final ClientRegistrationRepository clientRegistrationRepository){
         http
             .sessionManagement(session ->
                     session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.GET, "/api/v1/inventory/**").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
                     .requestMatchers(
                             "/swagger-ui/**",
                             "/swagger-ui.html",

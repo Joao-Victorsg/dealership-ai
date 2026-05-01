@@ -7,6 +7,10 @@ import org.springframework.context.ApplicationContextInitializer;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.testcontainers.containers.GenericContainer;
 
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
+
 public class EnvironmentInitializer
         implements ApplicationContextInitializer<ConfigurableApplicationContext> {
 
@@ -25,11 +29,16 @@ public class EnvironmentInitializer
         SALES_API_MOCK.start();
         KEYCLOAK_MOCK.start();
 
-        // Register JWKS endpoint on keycloak mock with test public key
-        registerJwksEndpoint();
+        // Register JWKS + OIDC discovery stubs so OAuth2 client auto-configures at startup
+        registerDefaultKeycloakStubs();
     }
 
-    private static void registerJwksEndpoint() {
+    public static String getKeycloakBaseUrl() {
+        return "http://localhost:" + KEYCLOAK_MOCK.port();
+    }
+
+    /** Registers JWKS and OIDC discovery stubs on the Keycloak mock. Call this after resetAll(). */
+    public static void registerDefaultKeycloakStubs() {
         final var publicKey = JwtTestUtils.getPublicKey();
         final String jwksJson;
         try {
@@ -37,13 +46,40 @@ public class EnvironmentInitializer
         } catch (Exception e) {
             throw new RuntimeException("Failed to serialize test JWKS", e);
         }
+
+        final String baseUrl = getKeycloakBaseUrl();
+        final String issuer = baseUrl + "/realms/dealership";
+
         KEYCLOAK_MOCK.stubFor(
-                com.github.tomakehurst.wiremock.client.WireMock.get(
-                                com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo(
-                                        "/realms/dealership/protocol/openid-connect/certs"))
-                        .willReturn(com.github.tomakehurst.wiremock.client.WireMock.aResponse()
+                get(urlPathEqualTo("/realms/dealership/protocol/openid-connect/certs"))
+                        .willReturn(aResponse()
                                 .withHeader("Content-Type", "application/json")
                                 .withBody(jwksJson)));
+
+        KEYCLOAK_MOCK.stubFor(
+                get(urlPathEqualTo("/realms/dealership/.well-known/openid-configuration"))
+                        .willReturn(aResponse()
+                                .withHeader("Content-Type", "application/json")
+                                .withBody(buildOidcDiscoveryJson(baseUrl, issuer))));
+    }
+
+    private static String buildOidcDiscoveryJson(final String baseUrl, final String issuer) {
+        return """
+                {
+                  "issuer": "%s",
+                  "authorization_endpoint": "%s/realms/dealership/protocol/openid-connect/auth",
+                  "token_endpoint": "%s/realms/dealership/protocol/openid-connect/token",
+                  "userinfo_endpoint": "%s/realms/dealership/protocol/openid-connect/userinfo",
+                  "jwks_uri": "%s/realms/dealership/protocol/openid-connect/certs",
+                  "end_session_endpoint": "%s/realms/dealership/protocol/openid-connect/logout",
+                  "response_types_supported": ["code"],
+                  "subject_types_supported": ["public"],
+                  "id_token_signing_alg_values_supported": ["RS256"],
+                  "scopes_supported": ["openid", "profile", "email", "offline_access"],
+                  "code_challenge_methods_supported": ["S256"],
+                  "grant_types_supported": ["authorization_code", "refresh_token"]
+                }
+                """.formatted(issuer, baseUrl, baseUrl, baseUrl, baseUrl, baseUrl);
     }
 
     public static WireMockServer getCarApiMock() {
@@ -70,11 +106,12 @@ public class EnvironmentInitializer
                 "spring.cloud.openfeign.client.config.car-api.url=http://localhost:" + CAR_API_MOCK.port(),
                 "spring.cloud.openfeign.client.config.client-api.url=http://localhost:" + CLIENT_API_MOCK.port(),
                 "spring.cloud.openfeign.client.config.sales-api.url=http://localhost:" + SALES_API_MOCK.port(),
-                "spring.cloud.openfeign.client.config.keycloak.url=http://localhost:" + KEYCLOAK_MOCK.port(),
                 "spring.security.oauth2.resourceserver.jwt.jwk-set-uri=http://localhost:"
                         + KEYCLOAK_MOCK.port()
                         + "/realms/dealership/protocol/openid-connect/certs",
-                "keycloak.base-url=http://localhost:" + KEYCLOAK_MOCK.port()
+                "spring.security.oauth2.client.provider.keycloak.issuer-uri=http://localhost:"
+                        + KEYCLOAK_MOCK.port()
+                        + "/realms/dealership"
         ).applyTo(context.getEnvironment());
     }
 }

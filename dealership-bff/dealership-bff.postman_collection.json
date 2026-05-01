@@ -2,20 +2,20 @@
   "info": {
     "name": "dealership-bff — Dealership AI",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Postman collection for the Dealership BFF. Base URL points to the API Gateway V2 invoke URL (LocalStack) or directly to the NLB when running docker compose.\n\nTypical flow:\n1. POST /api/v1/auth/register — create an account\n2. POST /api/v1/auth/login   — obtain {{accessToken}}\n3. Browse inventory, purchase a car, view profile/history\n\nThe 'accessToken' variable is populated automatically by the Login request."
+    "description": "Postman collection for the Dealership BFF.\n\nBase URL: http://localhost:8083 (local dev) or the API Gateway V2 invoke URL (LocalStack).\n\n─── Authentication (PKCE / Session-cookie flow) ───────────────────────\nLogin and registration happen through Keycloak's browser UI — not via API calls.\nPostman cannot drive a browser flow, so the steps are:\n\n  LOGIN:\n  1. Open in browser: {{baseUrl}}/oauth2/authorization/keycloak\n  2. Log in on the Keycloak page (e.g. client-user / client-pass)\n  3. Browser is redirected to localhost:3000 (no frontend — expected error)\n  4. Open browser DevTools → Application → Cookies → localhost:8083 → copy SESSION value\n  5. Paste the value into the 'sessionCookie' collection variable\n\n  REGISTER (new user):\n  1. Open in browser: {{baseUrl}}/oauth2/authorization/keycloak-register\n  2. Fill in the Keycloak registration form (first name, last name, email, password)\n  3. Browser redirects to localhost:3000/register/complete (expected error)\n  4. Copy SESSION cookie from DevTools (same as above) → paste into 'sessionCookie'\n  5. Send the 'Complete registration (business data)' request\n\nAll authenticated requests send the SESSION cookie via Cookie header automatically\nonce you set the {{sessionCookie}} variable."
   },
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://api-dealership-ai.elb.localhost.localstack.cloud:8083",
+      "value": "http://localhost:8083",
       "type": "string",
-      "description": "NLB DNS name for LocalStack (port 8083). Replace with the API Gateway V2 invoke URL (e.g. http://<api-id>.execute-api.localhost.localstack.cloud:4566) when the full LocalStack deployment is running."
+      "description": "BFF base URL. For local dev: http://localhost:8083. For LocalStack: http://api-dealership-ai.elb.localhost.localstack.cloud:8083."
     },
     {
-      "key": "accessToken",
+      "key": "sessionCookie",
       "value": "",
       "type": "string",
-      "description": "JWT access token populated automatically by the Login request"
+      "description": "SESSION cookie value obtained after completing the PKCE login or registration flow in the browser. See collection description for instructions."
     },
     {
       "key": "carId",
@@ -48,15 +48,44 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Register a new user",
+          "name": "[BROWSER] 1a. Initiate login",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/oauth2/authorization/keycloak",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth2", "authorization", "keycloak"]
+            },
+            "description": "⚠️  OPEN THIS URL IN A BROWSER — do not send from Postman.\n\nStarts the PKCE Authorization Code flow for login. Redirects to the Keycloak login page.\nAfter a successful login, Keycloak redirects back to the BFF which sets the SESSION cookie and redirects to the frontend (localhost:3000).\n\nTo use the session in Postman:\n  1. Open {{baseUrl}}/oauth2/authorization/keycloak in your browser\n  2. Log in (e.g. client-user / client-pass)\n  3. DevTools → Application → Cookies → http://localhost:8083 → copy SESSION value\n  4. Paste into the 'sessionCookie' collection variable"
+          },
+          "response": []
+        },
+        {
+          "name": "[BROWSER] 1b. Initiate registration",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/oauth2/authorization/keycloak-register",
+              "host": ["{{baseUrl}}"],
+              "path": ["oauth2", "authorization", "keycloak-register"]
+            },
+            "description": "⚠️  OPEN THIS URL IN A BROWSER — do not send from Postman.\n\nStarts the PKCE Authorization Code flow for registration. Redirects to the Keycloak registration page (not the login page).\nAfter the user submits the Keycloak form, the BFF sets the SESSION cookie and redirects to localhost:3000/register/complete.\n\nTo continue:\n  1. Open {{baseUrl}}/oauth2/authorization/keycloak-register in your browser\n  2. Fill in the Keycloak registration form\n  3. DevTools → Application → Cookies → http://localhost:8083 → copy SESSION value\n  4. Paste into the 'sessionCookie' collection variable\n  5. Send the 'Complete registration (business data)' request below"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Complete registration (business data)",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"joao.silva@example.com\",\n  \"password\": \"Str0ng@Pass\",\n  \"firstName\": \"João\",\n  \"lastName\": \"Silva\",\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\"\n}",
+              "raw": "{\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\",\n  \"streetNumber\": \"100\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -64,43 +93,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Creates a Keycloak account and the corresponding client profile in client-api. Returns 201 on success.\n\nPassword must be at least 8 characters. CPF must be a valid Brazilian CPF."
-          },
-          "response": []
-        },
-        {
-          "name": "Login",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "var json = pm.response.json();",
-                  "if (json && json.data && json.data.accessToken) {",
-                  "    pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                  "    console.log('accessToken updated');",
-                  "}"
-                ],
-                "type": "text/javascript"
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              { "key": "Content-Type", "value": "application/json" }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"joao.silva@example.com\",\n  \"password\": \"Str0ng@Pass\"\n}",
-              "options": { "raw": { "language": "json" } }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
-            },
-            "description": "Authenticates the user against Keycloak. Returns an access token in the response body and a refresh token in an HttpOnly cookie.\n\nThe test script sets {{accessToken}} automatically for use in subsequent requests."
+            "description": "Second step of registration — only needed for NEW users (not on every login).\n\nSends the business data (CPF, phone, address) that Keycloak does not collect.\nThe user identity (name, email, Keycloak ID) is extracted automatically from the SESSION.\n\nRequires: SESSION cookie set after completing the Keycloak registration form (step 1b).\nReturns 201 on success."
           },
           "response": []
         },
@@ -108,13 +101,15 @@
           "name": "Refresh access token",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/refresh",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "refresh"]
             },
-            "description": "Issues a new access token using the refresh token stored in the 'refresh_token' HttpOnly cookie set by Login. Postman automatically sends the cookie if it was received in the same collection. Returns 401 if no cookie is present."
+            "description": "Uses the refresh token stored in the server-side session to obtain a new access token. Returns 401 if the session has expired or the refresh token is invalid."
           },
           "response": []
         },
@@ -122,13 +117,15 @@
           "name": "Logout",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/logout",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "logout"]
             },
-            "description": "Revokes the refresh token and clears the HttpOnly cookie. Returns 204 on success."
+            "description": "Revokes the Keycloak refresh token and invalidates the server-side session. Returns 204 on success.\nAfter logout, clear the 'sessionCookie' collection variable."
           },
           "response": []
         }
@@ -210,7 +207,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "body": {
               "mode": "raw",
@@ -222,7 +219,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "purchases"]
             },
-            "description": "Initiates a car purchase for the authenticated client. The BFF orchestrates calls to client-api, car-api and sales-api. Requires ROLE_CLIENT JWT.\n\nSet {{carId}} from the inventory listing first. Returns 201 with the purchase details on success."
+            "description": "Initiates a car purchase for the authenticated client. The BFF orchestrates calls to client-api, car-api and sales-api. Requires ROLE_CLIENT session.\n\nSet {{carId}} from the inventory listing first. Returns 201 with the purchase details on success."
           },
           "response": []
         },
@@ -231,7 +228,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/purchases?page=0&size=20",
@@ -242,7 +239,7 @@
                 { "key": "size", "value": "20" }
               ]
             },
-            "description": "Returns the purchase history for the authenticated client. Requires ROLE_CLIENT JWT."
+            "description": "Returns the purchase history for the authenticated client. Requires ROLE_CLIENT session."
           },
           "response": []
         },
@@ -251,7 +248,7 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/purchases?page=0&size=20&from=2024-01-01T00:00:00Z&to=2024-12-31T23:59:59Z",
@@ -264,7 +261,7 @@
                 { "key": "to", "value": "2024-12-31T23:59:59Z", "description": "ISO-8601 instant" }
               ]
             },
-            "description": "Returns purchase history filtered by date range. Requires ROLE_CLIENT JWT."
+            "description": "Returns purchase history filtered by date range. Requires ROLE_CLIENT session."
           },
           "response": []
         }
@@ -278,14 +275,14 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/profile",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "profile"]
             },
-            "description": "Returns the profile of the authenticated user, aggregating data from client-api. Requires ROLE_CLIENT JWT."
+            "description": "Returns the profile of the authenticated user, aggregating data from client-api. Requires ROLE_CLIENT session."
           },
           "response": []
         },
@@ -295,7 +292,7 @@
             "method": "PATCH",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "body": {
               "mode": "raw",
@@ -307,7 +304,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "profile"]
             },
-            "description": "Updates the authenticated user's profile. Delegates to client-api. Requires ROLE_CLIENT JWT. All fields are optional — at least one must be provided."
+            "description": "Updates the authenticated user's profile. Delegates to client-api. Requires ROLE_CLIENT session. All fields are optional — at least one must be provided."
           },
           "response": []
         }
@@ -317,15 +314,16 @@
       "name": "Validation Errors (negative tests)",
       "item": [
         {
-          "name": "[400] Register — password too short",
+          "name": "[400] Register — invalid CPF",
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"abc\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\"\n}",
+              "raw": "{\n  \"cpf\": \"00000000000\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\",\n  \"streetNumber\": \"100\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -333,12 +331,12 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Should return 400 — password must be at least 8 characters."
+            "description": "Should return 400 VALIDATION_ERROR — CPF is arithmetically invalid."
           },
           "response": []
         },
         {
-          "name": "[400] Login — invalid email format",
+          "name": "[401] Register — no session",
           "request": {
             "method": "POST",
             "header": [
@@ -346,15 +344,15 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"Str0ng@Pass\"\n}",
+              "raw": "{\n  \"cpf\": \"529.982.247-25\",\n  \"phone\": \"+55 (11) 91234-5678\",\n  \"cep\": \"01310-100\",\n  \"streetNumber\": \"100\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "raw": "{{baseUrl}}/api/v1/auth/register",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
+              "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Should return 400 — email must be a valid email address."
+            "description": "Should return 401 — the register endpoint requires an authenticated session."
           },
           "response": []
         },
@@ -364,7 +362,7 @@
             "method": "POST",
             "header": [
               { "key": "Content-Type", "value": "application/json" },
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              { "key": "Cookie", "value": "SESSION={{sessionCookie}}" }
             ],
             "body": {
               "mode": "raw",
@@ -381,7 +379,7 @@
           "response": []
         },
         {
-          "name": "[401] Purchase — no token",
+          "name": "[401] Purchase — no session",
           "request": {
             "method": "POST",
             "header": [
@@ -397,7 +395,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "purchases"]
             },
-            "description": "Should return 401 — no bearer token provided."
+            "description": "Should return 401 — no SESSION cookie provided."
           },
           "response": []
         },
@@ -416,7 +414,7 @@
           "response": []
         },
         {
-          "name": "[401] Refresh — no cookie",
+          "name": "[401] Refresh — no session",
           "request": {
             "method": "POST",
             "header": [],
@@ -425,7 +423,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "auth", "refresh"]
             },
-            "description": "Call without a prior login (no refresh_token cookie). Should return 401."
+            "description": "Call without a SESSION cookie. Should return 401."
           },
           "response": []
         }

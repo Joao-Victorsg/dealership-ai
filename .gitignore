@@ -41,3 +41,16 @@ build/
 
 ### Python
 *__pycache__/
+
+.idea/*
+
+.vscode/*
+
+/devutils/volume
+
+.specify
+
+.github/prompts
+*/.github/prompts
+.github/agents
+*/.github/agents

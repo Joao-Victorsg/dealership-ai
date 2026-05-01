@@ -6,12 +6,13 @@ import br.com.dealership.dealershibff.dto.response.ApiResponse;
 import br.com.dealership.dealershibff.dto.response.ResponseMeta;
 import br.com.dealership.dealershibff.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,10 +33,15 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    @Operation(summary = "Register a new user")
+    @Operation(summary = "Complete business registration for an authenticated user")
     public CompletableFuture<ResponseEntity<ApiResponse<ClientApiClientResponse>>> register(
+            @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid final RegisterRequest request) {
-        return authService.register(request)
+        final String keycloakId = jwt.getSubject();
+        final String firstName = jwt.getClaimAsString("given_name");
+        final String lastName = jwt.getClaimAsString("family_name");
+        final String bearerToken = jwt.getTokenValue();
+        return authService.register(keycloakId, firstName, lastName, bearerToken, request)
                 .thenApply(client -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(ApiResponse.of(client, ResponseMeta.of(getRequestId()))));
     }

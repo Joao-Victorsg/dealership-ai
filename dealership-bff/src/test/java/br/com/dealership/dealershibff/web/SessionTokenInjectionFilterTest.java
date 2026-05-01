@@ -12,9 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -23,7 +21,6 @@ import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
 
 import java.time.Instant;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -162,6 +159,98 @@ class SessionTokenInjectionFilterTest {
     }
 
     @Test
+    void shouldInjectTokenWhenExpiryAttributeIsNull() throws Exception {
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("valid-token");
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_TOKEN_EXPIRY)).thenReturn(null);
+
+        final var requestCaptor = ArgumentCaptor.forClass(HttpServletRequest.class);
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(requestCaptor.capture(), eq(response));
+        assertThat(requestCaptor.getValue().getHeader("Authorization")).isEqualTo("Bearer valid-token");
+    }
+
+    @Test
+    void shouldInvalidateSessionWhenAuthorizeReturnsNull() throws Exception {
+        final Instant expired = Instant.now().minusSeconds(60);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("old-token");
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_TOKEN_EXPIRY)).thenReturn(expired);
+
+        final Authentication auth = mock(Authentication.class);
+        final SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(auth);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(authorizedClientManager.authorize(any())).thenReturn(null);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session).invalidate();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void shouldRefreshWithoutStoringRefreshTokenWhenNoneReturned() throws Exception {
+        final Instant expired = Instant.now().minusSeconds(60);
+        final Instant newExpiry = Instant.now().plusSeconds(3600);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("old-token");
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_TOKEN_EXPIRY)).thenReturn(expired);
+
+        final Authentication auth = mock(Authentication.class);
+        final SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(auth);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(refreshedAccessToken.getTokenValue()).thenReturn("new-token");
+        when(refreshedAccessToken.getExpiresAt()).thenReturn(newExpiry);
+        when(refreshedClient.getAccessToken()).thenReturn(refreshedAccessToken);
+        when(refreshedClient.getRefreshToken()).thenReturn(null);
+        when(authorizedClientManager.authorize(any())).thenReturn(refreshedClient);
+
+        final var requestCaptor = ArgumentCaptor.forClass(HttpServletRequest.class);
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(requestCaptor.capture(), eq(response));
+        assertThat(requestCaptor.getValue().getHeader("Authorization")).isEqualTo("Bearer new-token");
+        verify(session, never()).setAttribute(eq(OAuth2LoginSuccessHandler.SESSION_REFRESH_TOKEN), any());
+    }
+
+    @Test
+    void shouldPassThroughWhenAccessTokenIsBlank() throws Exception {
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("   ");
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(filterChain).doFilter(request, response);
+        verifyNoInteractions(authorizedClientManager);
+    }
+
+    @Test
+    void shouldInvalidateSessionWhenClientHasNullAccessToken() throws Exception {
+        final Instant expired = Instant.now().minusSeconds(60);
+        when(request.getSession(false)).thenReturn(session);
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("old-token");
+        when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_TOKEN_EXPIRY)).thenReturn(expired);
+
+        final Authentication auth = mock(Authentication.class);
+        final SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
+        securityContext.setAuthentication(auth);
+        SecurityContextHolder.setContext(securityContext);
+
+        when(refreshedClient.getAccessToken()).thenReturn(null);
+        when(authorizedClientManager.authorize(any())).thenReturn(refreshedClient);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(session).invalidate();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     void shouldStripeClientSuppliedAuthorizationHeader() throws Exception {
         when(request.getSession(false)).thenReturn(session);
         when(session.getAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN)).thenReturn("session-token");
@@ -173,5 +262,7 @@ class SessionTokenInjectionFilterTest {
 
         verify(filterChain).doFilter(requestCaptor.capture(), eq(response));
         assertThat(requestCaptor.getValue().getHeader("Authorization")).isEqualTo("Bearer session-token");
+        // also verify getHeaders() on the wrapper injects the same token
+        assertThat(requestCaptor.getValue().getHeaders("Authorization").nextElement()).isEqualTo("Bearer session-token");
     }
 }

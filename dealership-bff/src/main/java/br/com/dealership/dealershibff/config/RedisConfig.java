@@ -9,10 +9,18 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.session.data.redis.config.annotation.web.http.EnableRedisHttpSession;
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
 import java.time.Duration;
 
+// Spring Boot 4.x removed Spring Session auto-configuration, so we must explicitly enable it.
+// maxInactiveIntervalInSeconds must match server.servlet.session.timeout (1800s = 30 min).
+// redisNamespace is resolved via EmbeddedValueResolver from application.properties.
+@EnableRedisHttpSession(
+        maxInactiveIntervalInSeconds = 1800,
+        redisNamespace = "${spring.session.redis.namespace:spring:session}"
+)
 @Configuration
 @EnableCaching
 public class RedisConfig {

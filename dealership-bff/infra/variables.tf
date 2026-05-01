@@ -52,17 +52,28 @@ variable "keycloak_client_id" {
   default     = "dealership-bff"
 }
 
-variable "keycloak_system_client_id" {
-  description = "Keycloak client ID used for M2M / admin operations (client credentials flow)"
-  type        = string
-  default     = "dealership-system"
-}
-
-variable "keycloak_system_client_secret" {
-  description = "Client secret for the dealership-system Keycloak client"
+variable "keycloak_client_secret" {
+  description = "Keycloak client secret for the BFF OAuth2 client (both login and registration flows)"
   type        = string
   sensitive   = true
-  default     = "dealership-system-secret"
+}
+
+variable "app_post_login_redirect_uri" {
+  description = "Frontend URL to redirect to after successful login (e.g. https://app.example.com)"
+  type        = string
+  default     = "http://localhost:3000"
+}
+
+variable "app_post_logout_redirect_uri" {
+  description = "Frontend URL to redirect to after logout (e.g. https://app.example.com)"
+  type        = string
+  default     = "http://localhost:3000"
+}
+
+variable "app_post_registration_redirect_uri" {
+  description = "Frontend URL to redirect to after Keycloak registration (e.g. https://app.example.com/register/complete)"
+  type        = string
+  default     = "http://localhost:3000/register/complete"
 }
 
 variable "new_relic_license_key" {

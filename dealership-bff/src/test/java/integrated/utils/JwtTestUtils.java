@@ -61,8 +61,70 @@ public final class JwtTestUtils {
         }
     }
 
+    public static String generateToken(
+            final String subject,
+            final List<String> roles,
+            final String email,
+            final String firstName,
+            final String lastName) {
+        try {
+            final var claimsBuilder = new JWTClaimsSet.Builder()
+                    .subject(subject)
+                    .issuer("http://localhost/realms/dealership")
+                    .expirationTime(new Date(System.currentTimeMillis() + 3_600_000))
+                    .issueTime(new Date())
+                    .jwtID(UUID.randomUUID().toString())
+                    .claim("email", email)
+                    .claim("roles", roles)
+                    .claim("given_name", firstName)
+                    .claim("family_name", lastName);
+
+            if (roles != null && !roles.isEmpty()) {
+                claimsBuilder.claim("realm_access", java.util.Map.of("roles", roles));
+            }
+
+            final var header = new JWSHeader.Builder(JWSAlgorithm.RS256)
+                    .keyID(KEY_ID)
+                    .build();
+
+            final var jwt = new SignedJWT(header, claimsBuilder.build());
+            jwt.sign(new RSASSASigner(RSA_KEY));
+            return jwt.serialize();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate test JWT", e);
+        }
+    }
+
     public static String generateClientToken(final String subject) {
         return generateToken(subject, List.of("CLIENT"), subject + "@test.com");
+    }
+
+    public static String generateIdToken(
+            final String subject, final String nonce, final String issuer, final String clientId) {
+        try {
+            final var claimsBuilder = new JWTClaimsSet.Builder()
+                    .subject(subject)
+                    .issuer(issuer)
+                    .audience(clientId)
+                    .issueTime(new Date())
+                    .expirationTime(new Date(System.currentTimeMillis() + 3_600_000))
+                    .jwtID(UUID.randomUUID().toString())
+                    .claim("email", subject + "@test.com");
+
+            if (nonce != null) {
+                claimsBuilder.claim("nonce", nonce);
+            }
+
+            final var header = new JWSHeader.Builder(JWSAlgorithm.RS256)
+                    .keyID(KEY_ID)
+                    .build();
+
+            final var jwt = new SignedJWT(header, claimsBuilder.build());
+            jwt.sign(new RSASSASigner(RSA_KEY));
+            return jwt.serialize();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate test ID token", e);
+        }
     }
 
     public static String generateExpiredToken(final String subject) {

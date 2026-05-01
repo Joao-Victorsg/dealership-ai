@@ -1,28 +1,44 @@
 package integrated.security;
 
-import com.github.tomakehurst.wiremock.client.WireMock;
+import br.com.dealership.dealershibff.config.OAuth2LoginSuccessHandler;
 import integrated.BaseIT;
 import integrated.EnvironmentInitializer;
 import integrated.utils.JwtTestUtils;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.session.Session;
+import org.springframework.session.SessionRepository;
 
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 
-import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
-import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 
 class InputSanitizationIT extends BaseIT {
+
+    @SuppressWarnings("rawtypes")
+    @Autowired
+    private SessionRepository sessionRepository;
+
+    @BeforeEach
+    void resetMocks() {
+        EnvironmentInitializer.getKeycloakMock().resetAll();
+        EnvironmentInitializer.getClientApiMock().resetAll();
+        EnvironmentInitializer.registerDefaultKeycloakStubs();
+    }
 
     @Test
     void shouldReturn400ForInvalidCpfOnRegister() {
         RestAssured.given()
                 .contentType(ContentType.JSON)
+                .cookie("SESSION", createAuthenticatedSession())
                 .body("""
-                        {"email":"user@test.com","password":"password123","firstName":"A","lastName":"B","cpf":"00000000000","phone":"11999887766","cep":"01310100"}
+                        {"cpf":"00000000000","phone":"+55 (11) 99988-7766","cep":"01310100","streetNumber":"100"}
                         """)
                 .when()
                 .post("/api/v1/auth/register")
@@ -42,30 +58,14 @@ class InputSanitizationIT extends BaseIT {
                 .body("error.code", equalTo("VALIDATION_ERROR"));
     }
 
-    @Test
-    void shouldSetHttpOnlyFlagOnRefreshTokenCookie() {
-        EnvironmentInitializer.getKeycloakMock().resetAll();
-
-        final var publicKey = JwtTestUtils.getPublicKey();
-        final String jwksJson = "{\"keys\":[" + publicKey.toJSONString() + "]}";
-        EnvironmentInitializer.getKeycloakMock().stubFor(
-                WireMock.get(urlPathEqualTo("/realms/dealership/protocol/openid-connect/certs"))
-                        .willReturn(aResponse().withHeader("Content-Type", "application/json").withBody(jwksJson)));
-        EnvironmentInitializer.getKeycloakMock().stubFor(
-                WireMock.post(urlPathEqualTo("/realms/dealership/protocol/openid-connect/token"))
-                        .willReturn(aResponse()
-                                .withHeader("Content-Type", "application/json")
-                                .withBody("""
-                                        {"access_token":"test-token","refresh_token":"refresh-token","expires_in":3600,"refresh_expires_in":86400,"token_type":"Bearer"}
-                                        """)));
-
-        RestAssured.given()
-                .contentType(ContentType.JSON)
-                .body("{\"email\":\"user@test.com\",\"password\":\"password123\"}")
-                .when()
-                .post("/api/v1/auth/login")
-                .then()
-                .statusCode(200)
-                .header("Set-Cookie", containsString("HttpOnly"));
+    @SuppressWarnings("unchecked")
+    private String createAuthenticatedSession() {
+        final String accessToken = JwtTestUtils.generateToken(
+                "sanitize-test-user", List.of("CLIENT"), "sanitize@test.com", "Test", "User");
+        final Session session = (Session) sessionRepository.createSession();
+        session.setAttribute(OAuth2LoginSuccessHandler.SESSION_ACCESS_TOKEN, accessToken);
+        session.setAttribute(OAuth2LoginSuccessHandler.SESSION_TOKEN_EXPIRY, Instant.now().plusSeconds(3600));
+        sessionRepository.save(session);
+        return Base64.getEncoder().encodeToString(session.getId().getBytes(StandardCharsets.UTF_8));
     }
 }
