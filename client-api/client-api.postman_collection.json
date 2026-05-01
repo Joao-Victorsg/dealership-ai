@@ -1,0 +1,274 @@
+{
+  "info": {
+    "name": "client-api — Dealership AI",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Postman collection for the Client Profile API. Base URL targets LocalStack via the NLB DNS name.\n\nSet 'bearerToken' to a valid JWT before calling protected endpoints.\n- ROLE_CLIENT  → create / read / update / delete own profile\n- ROLE_ADMIN   → correct CPF\n- ROLE_SYSTEM  → update any profile"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://api-dealership-ai.elb.localhost.localstack.cloud:8081",
+      "type": "string",
+      "description": "NLB DNS name + port assigned by LocalStack"
+    },
+    {
+      "key": "bearerToken",
+      "value": "REPLACE_WITH_JWT",
+      "type": "string",
+      "description": "JWT bearer token for authenticated requests"
+    },
+    {
+      "key": "clientId",
+      "value": "",
+      "type": "string",
+      "description": "UUID of a client, populated automatically by the 'Register a new client' request"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Actuator health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Spring Boot Actuator health endpoint. No authentication required."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Clients",
+      "item": [
+        {
+          "name": "Register a new client",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.data && json.data.id) {",
+                  "    pm.collectionVariables.set('clientId', json.data.id);",
+                  "    console.log('clientId set to:', json.data.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keycloakId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"firstName\": \"João\",\n  \"lastName\": \"Silva\",\n  \"cpf\": \"529.982.247-25\",\n  \"phoneNumber\": \"+55 (11) 91234-5678\",\n  \"postcode\": \"01310-100\",\n  \"streetNumber\": \"100\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"]
+            },
+            "description": "Creates a new client profile linked to the given Keycloak ID. Requires ROLE_CLIENT JWT.\n\nThe test script automatically sets {{clientId}} from the response Location header ID.\n\nCPF must be a valid Brazilian CPF. Phone must follow: +55 (DD) NNNNN-NNNN. Postcode is passed to ViaCEP to resolve the full address."
+          },
+          "response": []
+        },
+        {
+          "name": "Get my profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/clients/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "me"]
+            },
+            "description": "Returns the profile of the authenticated user identified by the JWT subject. Requires ROLE_CLIENT."
+          },
+          "response": []
+        },
+        {
+          "name": "Update client profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"João Carlos\",\n  \"phoneNumber\": \"+55 (11) 99876-5432\",\n  \"postcode\": \"04538-133\",\n  \"streetNumber\": \"200\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Partially updates the client's personal info and/or address. Requires ROLE_CLIENT (own profile) or ROLE_SYSTEM. At least one field must be provided. Updating postcode triggers a ViaCEP lookup."
+          },
+          "response": []
+        },
+        {
+          "name": "Correct client CPF (admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cpf\": \"529.982.247-25\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}/cpf",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}", "cpf"]
+            },
+            "description": "Corrects the CPF on record. Requires ROLE_ADMIN. CPF must be a valid Brazilian CPF and must not already be in use by another client."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete (anonymize) client account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Soft-deletes the client by anonymizing all personal data. Requires ROLE_CLIENT. Returns 204 on success. The client must be active and the JWT subject must match the target profile."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation Errors (negative tests)",
+      "item": [
+        {
+          "name": "[400] Register — invalid phone format",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keycloakId\": \"aaaabbbb-cccc-dddd-eeee-ffffaaaabbbb\",\n  \"firstName\": \"Ana\",\n  \"lastName\": \"Costa\",\n  \"cpf\": \"111.444.777-35\",\n  \"phoneNumber\": \"11999990000\",\n  \"postcode\": \"01310-100\",\n  \"streetNumber\": \"5\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"]
+            },
+            "description": "Should return 400 — phone must follow the Brazilian format +55 (DD) NNNNN-NNNN."
+          },
+          "response": []
+        },
+        {
+          "name": "[422] Register — duplicate CPF",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keycloakId\": \"bbbbcccc-dddd-eeee-ffff-000011112222\",\n  \"firstName\": \"Duplicate\",\n  \"lastName\": \"User\",\n  \"cpf\": \"529.982.247-25\",\n  \"phoneNumber\": \"+55 (21) 91234-5678\",\n  \"postcode\": \"01310-100\",\n  \"streetNumber\": \"1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"]
+            },
+            "description": "Run 'Register a new client' first (same CPF). Should return 422 — duplicate CPF."
+          },
+          "response": []
+        },
+        {
+          "name": "[422] Update — profile already inactive",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Ghost\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "{{clientId}}"]
+            },
+            "description": "Run 'Delete client account' first. Should return 422 — cannot update an inactive profile."
+          },
+          "response": []
+        },
+        {
+          "name": "[401] Register — no token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"keycloakId\": \"ccccdddd-eeee-ffff-0000-111122223333\",\n  \"firstName\": \"No\",\n  \"lastName\": \"Auth\",\n  \"cpf\": \"111.444.777-35\",\n  \"phoneNumber\": \"+55 (11) 91234-0000\",\n  \"postcode\": \"01310-100\",\n  \"streetNumber\": \"1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/clients",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients"]
+            },
+            "description": "Should return 401 — no bearer token provided."
+          },
+          "response": []
+        },
+        {
+          "name": "[404] Get non-existent client",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/clients/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["clients", "me"]
+            },
+            "description": "Use a JWT whose subject does not match any client in the database. Should return 403 (profile not found is surfaced as Forbidden to avoid enumeration)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

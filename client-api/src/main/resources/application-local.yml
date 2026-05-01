@@ -1,0 +1,25 @@
+# Local development profile — active when SPRING_PROFILES_ACTIVE=local
+#
+# Overrides the OAuth2 resource-server settings from application.properties
+# to point at the Keycloak container running in docker-compose.
+#
+# "keycloak" resolves inside the dealership-ai-network Docker network.
+# From the host use http://localhost:8180 for the admin UI or manual testing.
+
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Explicit JWKS endpoint — used for JWT signature verification.
+          # The client-api uses jwk-set-uri (not issuer-uri), so Keycloak's
+          # issuer discovery document is not fetched; only the JWKS endpoint
+          # is called to resolve signing keys.
+          jwk-set-uri: http://keycloak:8080/realms/dealership/protocol/openid-connect/certs
+
+          # Audience validation — tokens must include 'dealership' in their
+          # 'aud' claim.  This rejects tokens issued for unrelated clients
+          # that happen to reach this service (e.g. tokens from the master
+          # realm or clients without the dealership-audience scope).
+          audiences:
+            - dealership

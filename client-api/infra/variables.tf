@@ -13,7 +13,7 @@ variable "db_host" {
 variable "db_port" {
   description = "Aurora PostgreSQL port"
   type        = number
-  default     = 4510
+  default     = 4512
 }
 
 variable "db_name" {
@@ -50,21 +50,21 @@ variable "redis_port" {
 variable "jwks_uri" {
   description = "OAuth2 JWK Set URI (spring.security.oauth2.resourceserver.jwt.jwk-set-uri)"
   type        = string
-  default     = "https://idp.example.com/realms/dealership/protocol/openid-connect/certs"
+  default     = "http://keycloak:8080/realms/dealership/protocol/openid-connect/certs"
 }
 
 variable "cpf_encryption_key" {
-  description = "AES-256-GCM key for CPF encryption at rest (Base64-encoded, 32 bytes)"
+  description = "AES-256-GCM key for CPF encryption at rest (Base64-encoded, 32 bytes). Override with a real key in production."
   type        = string
   sensitive   = true
-  default     = ""
+  default     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" # dev-only: 32 zero bytes
 }
 
 variable "cpf_hmac_secret" {
-  description = "HMAC-SHA256 secret for CPF uniqueness hash (Base64-encoded)"
+  description = "HMAC-SHA256 secret for CPF uniqueness hash (Base64-encoded). Override with a real secret in production."
   type        = string
   sensitive   = true
-  default     = ""
+  default     = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" # dev-only: 32 zero bytes
 }
 
 variable "viacep_base_url" {

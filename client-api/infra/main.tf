@@ -19,20 +19,21 @@ resource "aws_ecs_task_definition" "client_api" {
   container_definitions = jsonencode([
     {
       name      = "client-api"
-      image     = "joaovictorsg/client-api-dealership:${var.image_tag}"
+      image     = "000000000000.dkr.ecr.us-east-1.localhost.localstack.cloud:4566/joaovictorsg/client-api-dealership:${var.image_tag}"
       cpu       = 1024
       memory    = 2048
       essential = true
 
       portMappings = [
         {
-          containerPort = 8080
-          hostPort      = 8080
+          containerPort = 8081
+          hostPort      = 8081
           protocol      = "tcp"
         }
       ]
 
       environment = [
+        { name = "SERVER_PORT",         value = "8081" },
         { name = "DATASOURCE_URL",      value = "jdbc:postgresql://${var.db_host}:${var.db_port}/${var.db_name}" },
         { name = "DATASOURCE_USERNAME", value = var.db_username },
         { name = "DATASOURCE_PASSWORD", value = var.db_password },
@@ -56,7 +57,7 @@ resource "aws_ecs_task_definition" "client_api" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+        command     = ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
@@ -78,8 +79,8 @@ resource "aws_security_group" "client_api" {
 
   ingress {
     description = "App port from VPC (NLB forwards here)"
-    from_port   = 8080
-    to_port     = 8080
+    from_port   = 8081
+    to_port     = 8081
     protocol    = "tcp"
     cidr_blocks = [data.aws_vpc.vpc.cidr_block]
   }
@@ -100,7 +101,7 @@ resource "aws_security_group" "client_api" {
 
 resource "aws_lb_target_group" "client_api" {
   name        = "client-api-tg"
-  port        = 8080
+  port        = 8081
   protocol    = "TCP"
   vpc_id      = data.aws_vpc.vpc.id
   target_type = "ip"
@@ -109,7 +110,7 @@ resource "aws_lb_target_group" "client_api" {
     enabled             = true
     protocol            = "HTTP"
     path                = "/actuator/health"
-    port                = "8080"
+    port                = "8081"
     interval            = 30
     healthy_threshold   = 2
     unhealthy_threshold = 2
@@ -151,7 +152,7 @@ resource "aws_ecs_service" "client_api" {
   load_balancer {
     target_group_arn = aws_lb_target_group.client_api.arn
     container_name   = "client-api"
-    container_port   = 8080
+    container_port   = 8081
   }
 
   depends_on = [aws_lb_listener.client_api]

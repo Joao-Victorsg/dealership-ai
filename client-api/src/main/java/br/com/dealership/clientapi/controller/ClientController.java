@@ -32,7 +32,7 @@ public class ClientController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("hasRole('SYSTEM')")
     @Operation(summary = "Register a new client profile", operationId = "createClient",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponse(responseCode = "201", description = "Profile created")
