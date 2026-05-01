@@ -21,6 +21,7 @@ services:
       - SMTP_PASSWORD=
       - SMTP_EMAIL=noreply@example.com
       - DNS_ADDRESS=0.0.0.0
+      - MAIN_DOCKER_NETWORK=dealership-ai-network
     volumes:
       - "./localstack/localstack-init.sh:/etc/localstack/init/ready.d/localstack-init.sh"
       - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
@@ -74,11 +75,69 @@ services:
       - "./newrelic-infra.yml:/etc/newrelic-infra.yml"
     restart: unless-stopped
 
+  # ── Keycloak backing database ─────────────────────────────────────────────
+  # Dedicated Postgres instance for Keycloak — kept separate from the
+  # application databases so its lifecycle and credentials are independent.
+  postgres-keycloak:
+    container_name: postgres-keycloak
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - postgres-keycloak-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dealership-ai-network
+
+  # ── Keycloak identity provider ────────────────────────────────────────────
+  # Runs in dev mode (start-dev) so HTTPS is not required locally.
+  # Accessible from the host at http://localhost:8180 and from other
+  # containers by the stable hostname "keycloak" on port 8080.
+  # Admin console: http://localhost:8180/admin  (admin / admin)
+  keycloak:
+    container_name: keycloak
+    image: quay.io/keycloak/keycloak:26.2
+    command: start-dev
+    environment:
+      # Backing database
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-keycloak:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      # Bootstrap credentials for the master realm admin account
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      # Allow plain HTTP and any hostname in dev mode
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+    ports:
+      - "8180:8080"
+    depends_on:
+      postgres-keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/realms/master || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks:
+      - dealership-ai-network
+
 volumes:
   cache:
   smtp4dev-ai-data:
+    driver: local
+  postgres-keycloak-data:
     driver: local
 
 networks:
   dealership-ai-network:
     driver: bridge
+    name: dealership-ai-network
