@@ -1,0 +1,28 @@
+{
+  "saleId": "sale-123",
+  "carId": "car-456",
+  "clientId": "cli-789",
+  "saleValue": 110.0,
+  "registeredAt": "2026-05-22T19:35:44Z",
+  "clientSnapshot": {
+    "firstName": "Ana",
+    "lastName": "Silva",
+    "cpf": "12345678900",
+    "email": "ana@example.com",
+    "address": {
+      "street": "Main St",
+      "number": "100",
+      "complement": "Apt 2",
+      "neighborhood": "Centro",
+      "city": "Sao Paulo",
+      "state": "SP",
+      "postcode": "01000-000"
+    }
+  },
+  "carSnapshot": {
+    "manufacturer": "BMW",
+    "model": "320i",
+    "vin": "VIN123",
+    "listedValue": 100.0
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "Records": [
+    {
+      "messageId": "msg-1",
+      "receiptHandle": "rh-1",
+      "body": "{\"saleId\":\"sale-123\",\"carId\":\"car-456\",\"clientId\":\"cli-789\",\"saleValue\":110.00,\"registeredAt\":\"2026-05-22T19:35:44Z\",\"clientSnapshot\":{\"firstName\":\"Ana\",\"lastName\":\"Silva\",\"email\":\"ana@example.com\"},\"carSnapshot\":{\"manufacturer\":\"BMW\",\"model\":\"320i\",\"vin\":\"VIN123\",\"listedValue\":100.00}}",
+      "attributes": {},
+      "messageAttributes": {},
+      "md5OfBody": "",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:123456789012:invoice-queue",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

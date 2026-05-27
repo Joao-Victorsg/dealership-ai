@@ -1,0 +1,7 @@
+{
+  "saleId": "sale-123",
+  "invoiceBucket": "invoice-bucket",
+  "invoiceKey": "invoices/sale-123.html",
+  "recipientEmail": "ana@example.com",
+  "subject": "Dealership invoice sale-123"
+}
