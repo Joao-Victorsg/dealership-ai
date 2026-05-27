@@ -22,3 +22,8 @@ output "log_group_name" {
   description = "CloudWatch log group for ECS container logs"
   value       = aws_cloudwatch_log_group.sales_api.name
 }
+
+output "sale_events_topic_arn" {
+  description = "SNS topic ARN for sale events"
+  value       = data.terraform_remote_state.sns.outputs.sales_topic_arn
+}

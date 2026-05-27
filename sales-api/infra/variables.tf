@@ -53,12 +53,6 @@ variable "jwks_uri" {
   default     = "http://keycloak:8080/realms/dealership/protocol/openid-connect/certs"
 }
 
-variable "sns_topic_arn" {
-  description = "ARN of the SNS topic for sale events"
-  type        = string
-  default     = "arn:aws:sns:us-east-1:000000000000:sale-events"
-}
-
 variable "aws_region" {
   description = "AWS region used by the application's SNS client"
   type        = string

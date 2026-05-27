@@ -19,12 +19,13 @@ provider "aws" {
   skip_requesting_account_id  = true
 
   endpoints {
-    ecs  = "http://localhost:4566"
-    iam  = "http://localhost:4566"
-    ec2  = "http://localhost:4566"
-    logs = "http://localhost:4566"
-    elb    = "http://localhost:4566"
-    elbv2  = "http://localhost:4566"
-    sts    = "http://localhost:4566"
+    ecs   = "http://localhost:4566"
+    iam   = "http://localhost:4566"
+    ec2   = "http://localhost:4566"
+    logs  = "http://localhost:4566"
+    elb   = "http://localhost:4566"
+    elbv2 = "http://localhost:4566"
+    sns   = "http://localhost:4566"
+    sts   = "http://localhost:4566"
   }
 }

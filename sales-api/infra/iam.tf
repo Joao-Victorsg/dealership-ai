@@ -44,16 +44,16 @@ resource "aws_iam_role_policy" "ecs_task_config_read" {
         Resource = "arn:aws:ssm:us-east-1:*:parameter/dealership-ai/*"
       },
       {
-        Sid    = "ReadDatabaseSecret"
-        Effect = "Allow"
-        Action = ["secretsmanager:GetSecretValue"]
+        Sid      = "ReadDatabaseSecret"
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
         Resource = "arn:aws:secretsmanager:us-east-1:*:secret:database-password*"
       },
       {
-        Sid    = "PublishSaleEvents"
-        Effect = "Allow"
-        Action = ["sns:Publish"]
-        Resource = "arn:aws:sns:us-east-1:*:sale-events"
+        Sid      = "PublishSaleEvents"
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = data.terraform_remote_state.sns.outputs.sales_topic_arn
       }
     ]
   })

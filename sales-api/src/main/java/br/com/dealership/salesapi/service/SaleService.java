@@ -60,7 +60,7 @@ public class SaleService {
 
         final Sale sale;
         try {
-            sale = saleRepository.save(Sale.from(request, clientId, saleValue));
+            sale = saleRepository.saveAndFlush(Sale.from(request, clientId, saleValue));
         } catch (DataIntegrityViolationException _) {
             throw new CarAlreadySoldException("Car already sold: " + request.carId());
         }

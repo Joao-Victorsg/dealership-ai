@@ -33,17 +33,17 @@ resource "aws_ecs_task_definition" "sales_api" {
       ]
 
       environment = [
-        { name = "SERVER_PORT",           value = "8082" },
-        { name = "DATASOURCE_URL",        value = "jdbc:postgresql://${var.db_host}:${var.db_port}/${var.db_name}" },
-        { name = "DATASOURCE_USERNAME",   value = var.db_username },
-        { name = "DATASOURCE_PASSWORD",   value = var.db_password },
-        { name = "REDIS_HOST",            value = var.redis_host },
-        { name = "REDIS_PORT",            value = tostring(var.redis_port) },
-        { name = "JWKS_URI",              value = var.jwks_uri },
-        { name = "SNS_TOPIC_ARN",         value = var.sns_topic_arn },
-        { name = "AWS_REGION",            value = var.aws_region },
+        { name = "SERVER_PORT", value = "8082" },
+        { name = "DATASOURCE_URL", value = "jdbc:postgresql://${var.db_host}:${var.db_port}/${var.db_name}" },
+        { name = "DATASOURCE_USERNAME", value = var.db_username },
+        { name = "DATASOURCE_PASSWORD", value = var.db_password },
+        { name = "REDIS_HOST", value = var.redis_host },
+        { name = "REDIS_PORT", value = tostring(var.redis_port) },
+        { name = "JWKS_URI", value = var.jwks_uri },
+        { name = "SNS_TOPIC_ARN", value = data.terraform_remote_state.sns.outputs.sales_topic_arn },
+        { name = "AWS_REGION", value = var.aws_region },
         { name = "NEW_RELIC_LICENSE_KEY", value = var.new_relic_license_key },
-        { name = "NEW_RELIC_APP_NAME",    value = var.new_relic_app_name }
+        { name = "NEW_RELIC_APP_NAME", value = var.new_relic_app_name }
       ]
 
       logConfiguration = {

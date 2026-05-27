@@ -73,7 +73,7 @@ class SaleServiceTest {
         var token = mockToken(clientId);
 
         Sale savedSale = buildSaleEntity(clientId, request, BigDecimal.valueOf(11000.0000));
-        when(saleRepository.save(any())).thenReturn(savedSale);
+        when(saleRepository.saveAndFlush(any())).thenReturn(savedSale);
 
         SaleResponse result = saleService.registerSale(request, token);
 
@@ -121,7 +121,7 @@ class SaleServiceTest {
         var request = buildValidRequest(clientId, CarStatus.AVAILABLE, BigDecimal.valueOf(10000));
         var token = mockToken(clientId);
 
-        when(saleRepository.save(any())).thenThrow(DataIntegrityViolationException.class);
+        when(saleRepository.saveAndFlush(any())).thenThrow(DataIntegrityViolationException.class);
 
         assertThrows(CarAlreadySoldException.class,
                 () -> saleService.registerSale(request, token));
@@ -133,7 +133,7 @@ class SaleServiceTest {
         var request = buildValidRequest(clientId, CarStatus.AVAILABLE, BigDecimal.valueOf(10000));
         var token = mockToken(clientId);
         Sale savedSale = buildSaleEntity(clientId, request, BigDecimal.valueOf(11000.0000));
-        when(saleRepository.save(any())).thenReturn(savedSale);
+        when(saleRepository.saveAndFlush(any())).thenReturn(savedSale);
         doThrow(SnsPublishException.class).when(snsPublisher).publish(any());
 
         assertThrows(SnsPublishException.class,
