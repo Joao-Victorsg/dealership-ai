@@ -13,6 +13,7 @@ public record ClientResponse(
         @Schema(description = "Unique identifier") UUID id,
         @Schema(description = "First name") String firstName,
         @Schema(description = "Last name") String lastName,
+        @Schema(description = "Brazilian CPF") String cpf,
         @Schema(description = "Brazilian phone number") String phoneNumber,
         @Schema(description = "Residential address") AddressResponse address,
         @Schema(description = "Timestamp when the profile was created") LocalDateTime createdAt,
@@ -24,6 +25,7 @@ public record ClientResponse(
                 .id(client.getId())
                 .firstName(client.getFirstName())
                 .lastName(client.getLastName())
+                .cpf(client.getCpf())
                 .phoneNumber(client.getPhoneNumber())
                 .address(AddressResponse.from(client.getAddress()))
                 .createdAt(client.getCreatedAt())

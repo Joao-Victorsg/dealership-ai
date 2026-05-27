@@ -1,0 +1,420 @@
+openapi: 3.1.0
+info:
+  title: Client API
+  description: |
+    Customer profile management service for the automotive dealership platform.
+    
+    This service is the sole owner of customer business profile data. It acts as an 
+    OAuth2 Resource Server — all requests must carry a valid JWT issued by Keycloak.
+    There are no public endpoints.
+    
+    ## Roles
+    | Role | Access |
+    |------|--------|
+    | `ROLE_CLIENT` | Own profile only (matched by Keycloak subject ID) |
+    | `ROLE_ADMIN` | Restricted operations (CPF correction) |
+    | `ROLE_SYSTEM` | Internal service operations (address retry) |
+    | `ROLE_STAFF` | **No access** to any endpoint in this service |
+  version: 1.0.0
+  contact:
+    name: Dealership Platform Team
+
+servers:
+  - url: /
+    description: Service root (accessed via BFF)
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /clients:
+    post:
+      summary: Register a new client profile
+      description: |
+        Creates a new client business profile. Called by the BFF after successfully 
+        creating the corresponding user in Keycloak. The Keycloak subject ID must be 
+        provided in the request body.
+
+        On success, the service attempts to resolve the full address via the postal code 
+        lookup service (ViaCEP). If the lookup fails, the profile is still created with 
+        partial address data and `isAddressSearched = false`.
+      operationId: createClient
+      tags: [Clients]
+      security:
+        - bearerAuth: [ROLE_CLIENT]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateClientRequest'
+      responses:
+        '201':
+          description: Client profile created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+
+  /clients/me:
+    get:
+      summary: Get the authenticated client's own profile
+      description: |
+        Returns the full profile of the currently authenticated client. The profile is 
+        identified by matching the Keycloak subject ID from the JWT `sub` claim against 
+        the stored `keycloakId`.
+
+        Responses are served from cache (Redis) with a 24-hour TTL. A cache miss falls 
+        through to the database.
+      operationId: getMyProfile
+      tags: [Clients]
+      security:
+        - bearerAuth: [ROLE_CLIENT]
+      responses:
+        '200':
+          description: Client profile returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /clients/{id}:
+    patch:
+      summary: Update the authenticated client's profile
+      description: |
+        Updates the updatable fields of the client profile identified by `{id}`.
+        All fields are optional: `firstName`, `lastName`, `phoneNumber`, `postcode`,
+        and `streetNumber`. Address fields are conditional — if `postcode` is present
+        then `streetNumber` must also be present, and vice versa; violating this
+        constraint returns 400. When address fields are provided, a ViaCEP lookup is
+        triggered to resolve the full address. All other fields are silently ignored.
+
+        `ROLE_CLIENT`: ownership is enforced — the JWT `sub` must match the profile's
+        `keycloakId`, otherwise 403. `ROLE_SYSTEM`: ownership check is bypassed; used
+        by the automatic address retry process. `ROLE_ADMIN` and `ROLE_STAFF` receive 403.
+
+        Inactive (anonymized) profiles cannot be updated — 422 is returned.
+      operationId: updateClient
+      tags: [Clients]
+      security:
+        - bearerAuth: [ROLE_CLIENT, ROLE_SYSTEM]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateClientRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+
+    delete:
+      summary: Anonymize (soft-delete) the authenticated client's own account
+      description: |
+        Permanently anonymizes the client profile identified by `{id}`. All personally 
+        identifiable fields are replaced with non-identifiable values. The internal UUID 
+        is preserved for referential integrity.
+
+        This operation is **irreversible**. After anonymization:
+        - The profile is permanently inactive.
+        - No update or reactivation is possible.
+        - The cache entry for this profile is invalidated immediately.
+
+        The client may only delete their own profile. The Keycloak subject ID from the 
+        JWT must match the profile's `keycloakId` — otherwise 403.
+
+        The caller (BFF) is responsible for also removing the user from Keycloak — 
+        this service does not communicate with Keycloak directly.
+      operationId: deleteClient
+      tags: [Clients]
+      security:
+        - bearerAuth: [ROLE_CLIENT]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      responses:
+        '204':
+          description: Profile successfully anonymized. No content returned.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+
+  /clients/{id}/cpf:
+    patch:
+      summary: Correct the CPF of a client profile (admin only)
+      description: |
+        Allows an administrator to correct the CPF of an existing client profile.
+        This operation is not available to any other role, including `ROLE_CLIENT` 
+        and `ROLE_STAFF`.
+
+        The new CPF must pass the same format validation and uniqueness checks as at 
+        registration. Duplicate CPFs are rejected with 422.
+      operationId: correctCpf
+      tags: [Admin]
+      security:
+        - bearerAuth: [ROLE_ADMIN]
+      parameters:
+        - $ref: '#/components/parameters/ClientId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCpfRequest'
+      responses:
+        '200':
+          description: CPF corrected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/BusinessRuleViolation'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Keycloak-issued JWT. Roles are extracted from the `realm_access.roles` claim.
+
+  parameters:
+    ClientId:
+      name: id
+      in: path
+      required: true
+      description: The client's internal UUID
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+
+    CreateClientRequest:
+      type: object
+      required: [keycloakId, firstName, lastName, cpf, phoneNumber, postcode, streetNumber]
+      properties:
+        keycloakId:
+          type: string
+          description: Keycloak subject ID (`sub` claim) assigned by the identity provider
+          example: "a3f2e1d0-1234-5678-abcd-000000000001"
+        firstName:
+          type: string
+          maxLength: 100
+          example: "João"
+        lastName:
+          type: string
+          maxLength: 100
+          example: "Silva"
+        cpf:
+          type: string
+          description: "Brazilian CPF. Accepted formats: 123.456.789-09 or 12345678909"
+          example: "123.456.789-09"
+        phoneNumber:
+          type: string
+          description: "Brazilian phone including country code and area code"
+          example: "+55 (11) 91234-5678"
+        postcode:
+          type: string
+          description: "Brazilian CEP"
+          example: "01310-100"
+        streetNumber:
+          type: string
+          maxLength: 20
+          example: "1578"
+
+    UpdateClientRequest:
+      type: object
+      description: |
+        All fields are optional. Only non-null fields are applied.
+
+        Address fields (`postcode` and `streetNumber`) are conditionally co-required:
+        if either is present both MUST be present — sending only one returns 400.
+        When address fields are provided, a ViaCEP lookup is triggered to resolve
+        the full address.
+
+        Read-only fields (CPF, Keycloak subject ID, internal UUID, registration date)
+        are silently ignored if included.
+      properties:
+        firstName:
+          type: string
+          maxLength: 100
+          example: "João"
+        lastName:
+          type: string
+          maxLength: 100
+          example: "Santos"
+        phoneNumber:
+          type: string
+          description: "Brazilian phone including country code and area code"
+          example: "+55 (11) 99999-0000"
+        postcode:
+          type: string
+          description: "Brazilian CEP. Must be present together with streetNumber."
+          example: "04538-132"
+        streetNumber:
+          type: string
+          maxLength: 20
+          description: "Must be present together with postcode."
+          example: "200"
+
+    UpdateCpfRequest:
+      type: object
+      required: [cpf]
+      properties:
+        cpf:
+          type: string
+          description: "Corrected CPF. Same format and validation rules as at registration."
+          example: "987.654.321-00"
+
+    ClientResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Internal client UUID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        firstName:
+          type: string
+          example: "João"
+        lastName:
+          type: string
+          example: "Silva"
+        phoneNumber:
+          type: string
+          example: "+55 (11) 91234-5678"
+        address:
+          $ref: '#/components/schemas/AddressResponse'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-04-17T10:30:00Z"
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+
+    AddressResponse:
+      type: object
+      properties:
+        postcode:
+          type: string
+          example: "01310-100"
+        streetNumber:
+          type: string
+          example: "1578"
+        streetName:
+          type: string
+          nullable: true
+          example: "Avenida Paulista"
+        city:
+          type: string
+          nullable: true
+          example: "São Paulo"
+        state:
+          type: string
+          nullable: true
+          example: "SP"
+        addressSearched:
+          type: boolean
+          example: true
+
+    ValidationErrorResponse:
+      type: object
+      required: [status, errors]
+      properties:
+        status:
+          type: integer
+          example: 400
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    FieldError:
+      type: object
+      properties:
+        field:
+          type: string
+          example: "cpf"
+        message:
+          type: string
+          example: "CPF inválido"
+
+    BusinessErrorResponse:
+      type: object
+      required: [status, code, message]
+      properties:
+        status:
+          type: integer
+          example: 422
+        code:
+          type: string
+          example: "CPF_ALREADY_EXISTS"
+        message:
+          type: string
+          example: "O CPF informado já está em uso"
+
+  responses:
+    ValidationError:
+      description: One or more request fields failed validation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+
+    BusinessRuleViolation:
+      description: Request was well-formed but violates a business rule
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/BusinessErrorResponse'
+
+    Unauthorized:
+      description: Missing or invalid authentication token
+
+    Forbidden:
+      description: |
+        Authenticated but not authorized. This is returned both for role-based 
+        access failures AND for cross-profile access attempts (ownership violation). 
+        404 is never returned for privacy reasons.

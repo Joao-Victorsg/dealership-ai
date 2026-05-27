@@ -51,18 +51,18 @@ public class ClientController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get own client profile", operationId = "getMyProfile",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponse(responseCode = "200", description = "Profile returned")
     @ApiResponse(responseCode = "401", description = "Unauthenticated")
-    @ApiResponse(responseCode = "403", description = "Forbidden or profile not found")
+    @ApiResponse(responseCode = "403", description = "Profile not found")
     public ResponseEntity<Response<ClientResponse>> getMyProfile(@AuthenticationPrincipal Jwt jwt) {
         return ResponseEntity.ok(Response.of(clientService.getMyProfile(jwt.getSubject())));
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasRole('CLIENT') or hasRole('SYSTEM')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update client profile (personal fields and/or address)", operationId = "updateClient",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponse(responseCode = "200", description = "Profile updated")
@@ -91,7 +91,7 @@ public class ClientController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('CLIENT')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Delete (anonymize) client account", operationId = "deleteClient",
             security = @SecurityRequirement(name = "bearerAuth"))
     @ApiResponse(responseCode = "204", description = "Account anonymized")

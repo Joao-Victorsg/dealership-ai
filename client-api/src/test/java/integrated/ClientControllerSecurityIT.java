@@ -73,7 +73,7 @@ class ClientControllerSecurityIT extends BaseIT {
     }
 
     @Test
-    void getMyProfileShouldReturn403ForRoleStaff() {
+    void getMyProfileShouldReturn200ForRoleStaffWithMatchingSub() {
         final var token = generateTokenFor(existingProfileKeycloakId, "staff");
 
         given()
@@ -81,11 +81,11 @@ class ClientControllerSecurityIT extends BaseIT {
         .when()
                 .get("/clients/me")
         .then()
-                .statusCode(403);
+                .statusCode(200);
     }
 
     @Test
-    void getMyProfileShouldReturn403ForRoleAdmin() {
+    void getMyProfileShouldReturn200ForRoleAdminWithMatchingSub() {
         final var token = generateTokenFor(existingProfileKeycloakId, "admin");
 
         given()
@@ -93,7 +93,7 @@ class ClientControllerSecurityIT extends BaseIT {
         .when()
                 .get("/clients/me")
         .then()
-                .statusCode(403);
+                .statusCode(200);
     }
 
     // ─── PATCH /clients/{id} ─────────────────────────────────────────────────

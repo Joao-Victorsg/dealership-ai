@@ -271,7 +271,58 @@ class ClientControllerIT extends BaseIT {
         .then()
                 .statusCode(200)
                 .body("data.firstName", equalTo("João"))
-                .body("data.cpf", nullValue())
+                .body("data.cpf", equalTo("529.982.247-25"))
+                .body("data.keycloakId", nullValue());
+    }
+
+    @Test
+    void getMyProfileShouldReturn200OnConsecutiveReadsFromCache() {
+        getWireMockClient().register(
+                get(urlPathMatching("/ws/.+/json/")).atPriority(1)
+                        .willReturn(aResponse().withStatus(503)));
+
+        final var keycloakId = UUID.randomUUID().toString();
+        final var createToken = generateTokenFor(keycloakId, "client");
+
+        given()
+                .contentType(ContentType.JSON)
+                .header("Authorization", "Bearer " + createToken)
+                .body("""
+                        {
+                          "keycloakId": "%s",
+                          "firstName": "Cache",
+                          "lastName": "User",
+                          "cpf": "529.982.247-25",
+                          "phoneNumber": "+55 11 99999-9999",
+                          "postcode": "01310-100",
+                          "streetNumber": "1"
+                        }
+                        """.formatted(keycloakId))
+        .when()
+                .post("/clients")
+        .then()
+                .statusCode(201);
+
+        final var getToken = generateTokenFor(keycloakId, "client");
+
+        given()
+                .header("Authorization", "Bearer " + getToken)
+        .when()
+                .get("/clients/me")
+        .then()
+                .statusCode(200)
+                .body("data.firstName", equalTo("Cache"))
+                .body("data.cpf", equalTo("529.982.247-25"))
+                .body("data.keycloakId", nullValue());
+
+        given()
+                .header("Authorization", "Bearer " + getToken)
+        .when()
+                .get("/clients/me")
+        .then()
+                .statusCode(200)
+                .body("data.firstName", equalTo("Cache"))
+                .body("data.cpf", equalTo("529.982.247-25"))
                 .body("data.keycloakId", nullValue());
     }
 
@@ -495,7 +546,7 @@ class ClientControllerIT extends BaseIT {
                 .patch("/clients/" + profileId + "/cpf")
         .then()
                 .statusCode(200)
-                .body("data.cpf", nullValue());
+                .body("data.cpf", equalTo("111.444.777-35"));
     }
 
     @Test
