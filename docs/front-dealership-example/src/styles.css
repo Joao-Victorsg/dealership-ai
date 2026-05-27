@@ -1,0 +1,233 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Aurelio Motors — Design System
+ *
+ * Personality: Trustworthy · Premium · Efficient.
+ * Light-mode-first. Warm off-white surfaces, deep oxblood accent,
+ * editorial typography (Bricolage Grotesque + Geist).
+ *
+ * All colors use oklch. Add new tokens to :root AND .dark, then
+ * register them in @theme inline as --color-<name>: var(--<name>).
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+
+  --font-display: "Bricolage Grotesque", ui-serif, Georgia, serif;
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* Warm off-white background, slightly tinted */
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.18 0.01 60);
+
+  --surface: oklch(0.975 0.005 85);
+  --surface-foreground: oklch(0.18 0.01 60);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.01 60);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.01 60);
+
+  /* Deep oxblood — used sparingly */
+  --primary: oklch(0.42 0.13 25);
+  --primary-foreground: oklch(0.985 0.004 85);
+
+  --secondary: oklch(0.94 0.006 80);
+  --secondary-foreground: oklch(0.18 0.01 60);
+
+  --muted: oklch(0.94 0.006 80);
+  --muted-foreground: oklch(0.45 0.012 60);
+
+  --accent: oklch(0.93 0.012 80);
+  --accent-foreground: oklch(0.18 0.01 60);
+
+  --destructive: oklch(0.55 0.20 27);
+  --destructive-foreground: oklch(0.985 0.004 85);
+
+  --success: oklch(0.55 0.10 145);
+  --success-foreground: oklch(0.985 0.004 85);
+
+  --warning: oklch(0.65 0.13 75);
+  --warning-foreground: oklch(0.18 0.01 60);
+
+  --border: oklch(0.88 0.008 75);
+  --border-strong: oklch(0.78 0.01 70);
+  --input: oklch(0.88 0.008 75);
+  --ring: oklch(0.42 0.13 25);
+}
+
+.dark {
+  --background: oklch(0.16 0.008 60);
+  --foreground: oklch(0.96 0.004 85);
+  --surface: oklch(0.20 0.01 60);
+  --surface-foreground: oklch(0.96 0.004 85);
+  --card: oklch(0.22 0.01 60);
+  --card-foreground: oklch(0.96 0.004 85);
+  --popover: oklch(0.22 0.01 60);
+  --popover-foreground: oklch(0.96 0.004 85);
+  --primary: oklch(0.62 0.16 25);
+  --primary-foreground: oklch(0.16 0.008 60);
+  --secondary: oklch(0.27 0.012 60);
+  --secondary-foreground: oklch(0.96 0.004 85);
+  --muted: oklch(0.27 0.012 60);
+  --muted-foreground: oklch(0.70 0.01 70);
+  --accent: oklch(0.30 0.014 60);
+  --accent-foreground: oklch(0.96 0.004 85);
+  --destructive: oklch(0.65 0.20 27);
+  --destructive-foreground: oklch(0.96 0.004 85);
+  --success: oklch(0.70 0.12 145);
+  --success-foreground: oklch(0.16 0.008 60);
+  --warning: oklch(0.78 0.14 75);
+  --warning-foreground: oklch(0.16 0.008 60);
+  --border: oklch(1 0 0 / 12%);
+  --border-strong: oklch(1 0 0 / 22%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.62 0.16 25);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--color-foreground);
+  }
+
+  h1 { font-size: clamp(2.25rem, 5vw, 4rem); }
+  h2 { font-size: clamp(1.75rem, 3vw, 2.5rem); }
+  h3 { font-size: clamp(1.25rem, 2vw, 1.625rem); }
+
+  p {
+    max-width: 70ch;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-primary-foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Tabular numerals for prices, kilometers, dates */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer components {
+  /* Subtle paper-grain noise overlay for hero/feature sections */
+  .grain {
+    position: relative;
+    isolation: isolate;
+  }
+  .grain::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.04;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .grain > * { position: relative; z-index: 1; }
+
+  /* Hairline divider */
+  .hairline {
+    border-color: var(--color-border);
+  }
+
+  /* Page reveal: subtle staggered fade/lift on first paint */
+  .reveal {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: reveal 600ms var(--ease-out-expo) forwards;
+  }
+  .reveal-1 { animation-delay: 60ms; }
+  .reveal-2 { animation-delay: 140ms; }
+  .reveal-3 { animation-delay: 220ms; }
+  .reveal-4 { animation-delay: 300ms; }
+
+  @keyframes reveal {
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal { opacity: 1; transform: none; animation: none; }
+}
