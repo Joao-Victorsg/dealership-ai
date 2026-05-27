@@ -20,58 +20,73 @@ import static org.hamcrest.Matchers.notNullValue;
 class PurchaseIT extends BaseIT {
 
     private static final UUID CAR_ID = UUID.fromString("3f8a1c2d-0000-0000-0000-000000000001");
+    private static final String CLIENT_SUBJECT = "a48e6065-fb8a-420a-b174-3a9421bc2773";
     private String clientToken;
 
     private static final String AVAILABLE_CAR = """
             {
-              "id": "%s",
-              "model": "Civic",
-              "manufacturer": "Honda",
-              "manufacturingYear": 2023,
-              "externalColor": "White",
-              "internalColor": "Black",
-              "vin": "1HGBH41JXMN109186",
-              "status": "AVAILABLE",
-              "category": "SEDAN",
-              "type": "CAR",
-              "isNew": true,
-              "kilometers": 0,
-              "propulsionType": "GASOLINE",
-              "listedValue": 145000.00
-            }
-            """.formatted(CAR_ID);
-
-    private static final String CLIENT_RESPONSE = """
-            {
-              "id": "7c3e9f1a-0000-0000-0000-000000000001",
-              "keycloakId": "sub-123",
-              "firstName": "João",
-              "lastName": "Silva",
-              "cpf": "52998224725",
-              "phone": "11987654321",
-              "createdAt": "2026-01-10T09:30:00Z"
-            }
-            """;
-
-    private static final String SALE_RESPONSE = """
-            {
-              "id": "9b2e7f4c-0000-0000-0000-000000000001",
-              "registeredAt": "2026-04-26T14:00:00Z",
-              "status": "COMPLETED",
-              "vehicle": {
+              "data": {
                 "id": "%s",
                 "model": "Civic",
                 "manufacturer": "Honda",
                 "manufacturingYear": 2023,
                 "externalColor": "White",
+                "internalColor": "Black",
                 "vin": "1HGBH41JXMN109186",
+                "status": "AVAILABLE",
                 "category": "SEDAN",
+                "type": "CAR",
+                "isNew": true,
+                "kilometers": 0,
+                "propulsionType": "GASOLINE",
                 "listedValue": 145000.00
-              },
-              "client": {
+              }
+            }
+            """.formatted(CAR_ID);
+
+    private static final String CLIENT_RESPONSE = """
+            {
+              "data": {
+                "id": "7c3e9f1a-0000-0000-0000-000000000001",
+                "keycloakId": "%s",
                 "firstName": "João",
                 "lastName": "Silva",
-                "cpf": "52998224725"
+                "cpf": "52998224725",
+                "phone": "11987654321",
+                "createdAt": "2026-01-10T09:30:00",
+                "address": {
+                  "postcode": "01001000",
+                  "streetNumber": "100",
+                  "streetName": "Rua A",
+                  "city": "Sao Paulo",
+                  "state": "SP",
+                  "addressSearched": true
+                }
+              }
+            }
+            """.formatted(CLIENT_SUBJECT);
+
+    private static final String SALE_RESPONSE = """
+            {
+              "data": {
+                "id": "9b2e7f4c-0000-0000-0000-000000000001",
+                "registeredAt": "2026-04-26T14:00:00Z",
+                "status": "COMPLETED",
+                "vehicle": {
+                  "id": "%s",
+                  "model": "Civic",
+                  "manufacturer": "Honda",
+                  "manufacturingYear": 2023,
+                  "externalColor": "White",
+                  "vin": "1HGBH41JXMN109186",
+                  "category": "SEDAN",
+                  "listedValue": 145000.00
+                },
+                "client": {
+                  "firstName": "João",
+                  "lastName": "Silva",
+                  "cpf": "52998224725"
+                }
               }
             }
             """.formatted(CAR_ID);
@@ -101,7 +116,7 @@ class PurchaseIT extends BaseIT {
                                 .withStatus(201)
                                 .withBody(SALE_RESPONSE)));
 
-        clientToken = JwtTestUtils.generateToken("sub-123", List.of("CLIENT"), "joao@example.com");
+        clientToken = JwtTestUtils.generateToken(CLIENT_SUBJECT, List.of("CLIENT"), "joao@example.com");
     }
 
     @Test

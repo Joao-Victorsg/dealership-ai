@@ -31,13 +31,15 @@ class RegisterIT extends BaseIT {
 
     private static final String CLIENT_RESPONSE = """
             {
-              "id":"3f8a1c2d-0000-0000-0000-000000000010",
-              "keycloakId":"kc-reg-user",
-              "firstName":"John",
-              "lastName":"Doe",
-              "cpf":"52998224725",
-              "phone":"11999887766",
-              "createdAt":"2026-04-26T10:00:00Z"
+              "data": {
+                "id":"3f8a1c2d-0000-0000-0000-000000000010",
+                "keycloakId":"kc-reg-user",
+                "firstName":"John",
+                "lastName":"Doe",
+                "cpf":"52998224725",
+                "phone":"11999887766",
+                "createdAt":"2026-04-26T10:00:00"
+              }
             }
             """;
 

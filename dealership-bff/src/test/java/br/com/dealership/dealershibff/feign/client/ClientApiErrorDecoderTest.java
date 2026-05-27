@@ -2,6 +2,7 @@ package br.com.dealership.dealershibff.feign.client;
 
 import br.com.dealership.dealershibff.domain.exception.DownstreamServiceException;
 import br.com.dealership.dealershibff.domain.exception.DuplicateIdentityException;
+import br.com.dealership.dealershibff.domain.exception.ForbiddenException;
 import br.com.dealership.dealershibff.domain.exception.NotFoundException;
 import feign.Request;
 import feign.Response;
@@ -38,9 +39,29 @@ class ClientApiErrorDecoderTest {
     }
 
     @Test
+    void shouldReturnForbiddenExceptionFor403() {
+        final var response = Response.builder()
+                .status(403).headers(Collections.emptyMap()).request(dummyRequest).build();
+
+        final var ex = decoder.decode("getMe", response);
+
+        assertInstanceOf(ForbiddenException.class, ex);
+    }
+
+    @Test
     void shouldReturnDuplicateIdentityExceptionFor409() {
         final var response = Response.builder()
                 .status(409).headers(Collections.emptyMap()).request(dummyRequest).build();
+
+        final var ex = decoder.decode("createClient", response);
+
+        assertInstanceOf(DuplicateIdentityException.class, ex);
+    }
+
+    @Test
+    void shouldReturnDuplicateIdentityExceptionFor422() {
+        final var response = Response.builder()
+                .status(422).headers(Collections.emptyMap()).request(dummyRequest).build();
 
         final var ex = decoder.decode("createClient", response);
 

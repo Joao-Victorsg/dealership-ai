@@ -16,31 +16,35 @@ class InventorySearchIT extends BaseIT {
 
     private static final String SINGLE_CAR_RESPONSE = """
             {
-              "content": [
-                {
-                  "id": "3f8a1c2d-0000-0000-0000-000000000002",
-                  "model": "Corolla",
-                  "manufacturer": "Toyota",
-                  "manufacturingYear": 2022,
-                  "externalColor": "Blue",
-                  "internalColor": "Gray",
-                  "vin": "JTDKB20U480101234",
-                  "status": "AVAILABLE",
-                  "category": "SEDAN",
-                  "type": "HYBRID",
-                  "isNew": false,
-                  "kilometers": 25000.00,
-                  "propulsionType": "FRONT_WHEEL_DRIVE",
-                  "listedValue": 120000.00,
-                  "imageKey": "cars/abc456.jpg",
-                  "optionalItems": [],
-                  "registrationDate": "2026-01-10T09:00:00Z"
+              "data": {
+                "content": [
+                  {
+                    "id": "3f8a1c2d-0000-0000-0000-000000000002",
+                    "model": "Corolla",
+                    "manufacturer": "Toyota",
+                    "manufacturingYear": 2022,
+                    "externalColor": "Blue",
+                    "internalColor": "Gray",
+                    "vin": "JTDKB20U480101234",
+                    "status": "AVAILABLE",
+                    "category": "SEDAN",
+                    "type": "HYBRID",
+                    "isNew": false,
+                    "kilometers": 25000.00,
+                    "propulsionType": "FRONT_WHEEL_DRIVE",
+                    "listedValue": 120000.00,
+                    "imageKey": "cars/abc456.jpg",
+                    "optionalItems": [],
+                    "registrationDate": "2026-01-10T09:00:00Z"
+                  }
+                ],
+                "page": {
+                  "size": 20,
+                  "number": 0,
+                  "totalElements": 1,
+                  "totalPages": 1
                 }
-              ],
-              "totalElements": 1,
-              "totalPages": 1,
-              "number": 0,
-              "size": 20
+              }
             }
             """;
 
@@ -66,7 +70,8 @@ class InventorySearchIT extends BaseIT {
 
         EnvironmentInitializer.getCarApiMock().verify(
                 WireMock.getRequestedFor(urlPathEqualTo("/api/v1/cars"))
-                        .withQueryParam("q", WireMock.equalTo("corolla")));
+                        .withQueryParam("q", WireMock.equalTo("corolla"))
+                        .withQueryParam("status", WireMock.equalTo("AVAILABLE")));
     }
 
     @Test
@@ -104,6 +109,7 @@ class InventorySearchIT extends BaseIT {
 
         EnvironmentInitializer.getCarApiMock().verify(
                 WireMock.getRequestedFor(urlPathEqualTo("/api/v1/cars"))
-                        .withQueryParam("q", WireMock.matching("^[^<>]*$")));
+                        .withQueryParam("q", WireMock.matching("^[^<>]*$"))
+                        .withQueryParam("status", WireMock.equalTo("AVAILABLE")));
     }
 }

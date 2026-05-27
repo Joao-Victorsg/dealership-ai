@@ -44,4 +44,18 @@ class SalesApiErrorDecoderTest {
 
         assertInstanceOf(DownstreamServiceException.class, ex);
     }
+
+    @Test
+    void shouldReturnCarNotAvailableExceptionFor422AlreadySold() {
+        final var response = Response.builder()
+                .status(422)
+                .headers(Collections.emptyMap())
+                .request(dummyRequest)
+                .body("{\"message\":\"Car already sold: abc\"}", StandardCharsets.UTF_8)
+                .build();
+
+        final var ex = decoder.decode("registerSale", response);
+
+        assertInstanceOf(CarNotAvailableException.class, ex);
+    }
 }

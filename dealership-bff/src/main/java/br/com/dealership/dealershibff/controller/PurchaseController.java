@@ -44,7 +44,8 @@ public class PurchaseController {
             final JwtAuthenticationToken authentication) {
         final String bearerToken = "Bearer " + authentication.getToken().getTokenValue();
         final String email = authentication.getToken().getClaimAsString("email");
-        return purchaseService.purchase(request.carId(), bearerToken, email)
+        final UUID clientId = UUID.fromString(authentication.getName());
+        return purchaseService.purchase(request.carId(), bearerToken, email, clientId)
                 .thenApply(purchase -> ResponseEntity.status(201)
                         .body(ApiResponse.of(purchase, ResponseMeta.of(getRequestId()))));
     }

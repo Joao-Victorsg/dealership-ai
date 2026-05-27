@@ -1,7 +1,8 @@
 package br.com.dealership.dealershibff.config;
 
+import com.newrelic.api.agent.NewRelic;
+import com.newrelic.api.agent.Token;
 import org.slf4j.MDC;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,14 +23,24 @@ public class AsyncConfig {
         final var factory = Thread.ofVirtual().factory();
         return task -> {
             final Map<String, String> mdcContext = MDC.getCopyOfContextMap();
+            final Token token = NewRelic.getAgent().getTransaction().getToken();
             factory.newThread(() -> {
                 if (mdcContext != null) {
                     MDC.setContextMap(mdcContext);
                 }
                 try {
+                    if (token != null) {
+                        token.link();
+                    }
                     task.run();
                 } finally {
-                    MDC.clear();
+                    try {
+                        if (token != null) {
+                            token.expire();
+                        }
+                    } finally {
+                        MDC.clear();
+                    }
                 }
             }).start();
         };

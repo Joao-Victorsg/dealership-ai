@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,12 +39,27 @@ public class AuthController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody @Valid final RegisterRequest request) {
         final String keycloakId = jwt.getSubject();
-        final String firstName = jwt.getClaimAsString("given_name");
-        final String lastName = jwt.getClaimAsString("family_name");
-        final String bearerToken = jwt.getTokenValue();
-        return authService.register(keycloakId, firstName, lastName, bearerToken, request)
+        final String firstName = resolveName(
+                request.firstName(),
+                jwt.getClaimAsString("given_name"),
+                "firstName");
+        final String lastName = resolveName(
+                request.lastName(),
+                jwt.getClaimAsString("family_name"),
+                "lastName");
+        return authService.register(keycloakId, firstName, lastName, request)
                 .thenApply(client -> ResponseEntity.status(HttpStatus.CREATED)
                         .body(ApiResponse.of(client, ResponseMeta.of(getRequestId()))));
+    }
+
+    private String resolveName(final String fromRequest, final String fromJwt, final String field) {
+        if (StringUtils.hasText(fromRequest)) {
+            return fromRequest.strip();
+        }
+        if (StringUtils.hasText(fromJwt)) {
+            return fromJwt.strip();
+        }
+        throw new IllegalArgumentException(field + " is required");
     }
 
     private String getRequestId() {

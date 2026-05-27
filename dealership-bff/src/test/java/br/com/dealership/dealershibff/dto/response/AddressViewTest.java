@@ -16,7 +16,7 @@ class AddressViewTest {
     @Test
     void shouldMapFromSourceWhenNotNull() {
         final var source = new ClientApiAddressResponse(
-                "Rua A", "100", null, "Centro", "São Paulo", "SP", "01310100");
+                "01310100", "100", "Rua A", "São Paulo", "SP", true);
 
         final var result = AddressView.from(source);
 

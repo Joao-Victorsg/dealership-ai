@@ -4,17 +4,17 @@ import java.util.UUID;
 
 public record SalesApiRegisterRequest(
         UUID carId,
-        SalesApiVehicleSnapshot vehicle,
-        SalesApiClientSnapshot client,
-        String saleIntent
+        UUID clientId,
+        SalesApiClientSnapshot clientSnapshot,
+        SalesApiCarSnapshot carSnapshot
 ) {
 
     public static SalesApiRegisterRequest of(
             final UUID carId,
-            final SalesApiVehicleSnapshot vehicle,
-            final SalesApiClientSnapshot client,
-            final String saleIntent
+            final UUID clientId,
+            final SalesApiClientSnapshot clientSnapshot,
+            final SalesApiCarSnapshot carSnapshot
     ) {
-        return new SalesApiRegisterRequest(carId, vehicle, client, saleIntent);
+        return new SalesApiRegisterRequest(carId, clientId, clientSnapshot, carSnapshot);
     }
 }

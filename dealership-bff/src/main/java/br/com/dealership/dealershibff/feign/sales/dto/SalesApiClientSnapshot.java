@@ -8,6 +8,6 @@ public record SalesApiClientSnapshot(
         String lastName,
         String cpf,
         String email,
-        String phone
+        SalesApiAddressSnapshot address
 ) {
 }

@@ -10,6 +10,11 @@ resource "aws_cloudwatch_log_group" "dealership_bff" {
   }
 }
 
+locals {
+  resolved_redis_host = coalesce(var.redis_host, data.terraform_remote_state.elasticache.outputs.bff_redis_endpoint)
+  resolved_redis_port = coalesce(var.redis_port, tonumber(data.terraform_remote_state.elasticache.outputs.bff_redis_port))
+}
+
 resource "aws_ecs_task_definition" "dealership_bff" {
   family                   = "dealership-bff"
   network_mode             = "awsvpc"
@@ -35,20 +40,25 @@ resource "aws_ecs_task_definition" "dealership_bff" {
       ]
 
       environment = [
-        { name = "REDIS_HOST",            value = var.redis_host },
-        { name = "REDIS_PORT",            value = tostring(var.redis_port) },
-        { name = "KEYCLOAK_BASE_URL",              value = var.keycloak_base_url },
-        { name = "KEYCLOAK_REALM",                 value = var.keycloak_realm },
-        { name = "KEYCLOAK_CLIENT_ID",             value = var.keycloak_client_id },
-        { name = "KEYCLOAK_CLIENT_SECRET",         value = var.keycloak_client_secret },
-        { name = "APP_POST_LOGIN_REDIRECT_URI",        value = var.app_post_login_redirect_uri },
-        { name = "APP_POST_LOGOUT_REDIRECT_URI",       value = var.app_post_logout_redirect_uri },
+        { name = "REDIS_HOST", value = local.resolved_redis_host },
+        { name = "REDIS_PORT", value = tostring(local.resolved_redis_port) },
+        { name = "KEYCLOAK_BASE_URL", value = var.keycloak_base_url },
+        { name = "KEYCLOAK_EXTERNAL_URL", value = var.keycloak_external_url },
+        { name = "KEYCLOAK_REALM", value = var.keycloak_realm },
+        { name = "KEYCLOAK_CLIENT_ID", value = var.keycloak_client_id },
+        { name = "KEYCLOAK_CLIENT_SECRET", value = var.keycloak_client_secret },
+        { name = "KEYCLOAK_SYSTEM_CLIENT_ID", value = var.keycloak_system_client_id },
+        { name = "KEYCLOAK_SYSTEM_CLIENT_SECRET", value = var.keycloak_system_client_secret },
+        { name = "APP_POST_LOGIN_REDIRECT_URI", value = var.app_post_login_redirect_uri },
+        { name = "APP_POST_LOGOUT_REDIRECT_URI", value = var.app_post_logout_redirect_uri },
         { name = "APP_POST_REGISTRATION_REDIRECT_URI", value = var.app_post_registration_redirect_uri },
-        { name = "CAR_API_BASE_URL",      value = coalesce(var.car_api_base_url,    "http://${data.aws_lb.nlb.dns_name}:8080") },
-        { name = "CLIENT_API_BASE_URL",   value = coalesce(var.client_api_base_url, "http://${data.aws_lb.nlb.dns_name}:8081") },
-        { name = "SALES_API_BASE_URL",    value = coalesce(var.sales_api_base_url,  "http://${data.aws_lb.nlb.dns_name}:8082") },
+        { name = "SESSION_COOKIE_SECURE", value = tostring(var.session_cookie_secure) },
+        { name = "SESSION_COOKIE_SAME_SITE", value = lower(var.session_cookie_same_site) },
+        { name = "CAR_API_BASE_URL", value = coalesce(var.car_api_base_url, "http://${data.aws_lb.nlb.dns_name}:8080") },
+        { name = "CLIENT_API_BASE_URL", value = coalesce(var.client_api_base_url, "http://${data.aws_lb.nlb.dns_name}:8081") },
+        { name = "SALES_API_BASE_URL", value = coalesce(var.sales_api_base_url, "http://${data.aws_lb.nlb.dns_name}:8082") },
         { name = "NEW_RELIC_LICENSE_KEY", value = var.new_relic_license_key },
-        { name = "NEW_RELIC_APP_NAME",    value = var.new_relic_app_name }
+        { name = "NEW_RELIC_APP_NAME", value = var.new_relic_app_name }
       ]
 
       logConfiguration = {

@@ -10,10 +10,11 @@ import br.com.dealership.dealershibff.feign.car.dto.CarApiCarResponse;
 import br.com.dealership.dealershibff.feign.client.ClientApiClient;
 import br.com.dealership.dealershibff.feign.client.dto.ClientApiClientResponse;
 import br.com.dealership.dealershibff.feign.sales.SalesApiClient;
+import br.com.dealership.dealershibff.feign.sales.dto.SalesApiAddressSnapshot;
+import br.com.dealership.dealershibff.feign.sales.dto.SalesApiCarSnapshot;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiClientSnapshot;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiRegisterRequest;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiSaleResponse;
-import br.com.dealership.dealershibff.feign.sales.dto.SalesApiVehicleSnapshot;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -56,19 +58,23 @@ public class PurchaseService {
     @RateLimiter(name = "sales-api")
     @TimeLimiter(name = "sales-api")
     @Bulkhead(name = "sales-api")
-    public CompletableFuture<PurchaseResponse> purchase(final UUID carId, final String bearerToken, final String emailFromJwt) {
+    public CompletableFuture<PurchaseResponse> purchase(
+            final UUID carId,
+            final String bearerToken,
+            final String emailFromJwt,
+            final UUID clientId) {
         return CompletableFuture.supplyAsync(() -> {
             // Step 1: availability check
-            final var availability = carApiClient.getCarById(carId);
+            final var availability = carApiClient.getCarById(carId).data();
             if (!"AVAILABLE".equalsIgnoreCase(availability.status())) {
                 throw new CarNotAvailableException("Car " + carId + " is not available for purchase");
             }
 
             // Step 2: parallel fetch of full car data + client profile
             final CompletableFuture<CarApiCarResponse> carFuture =
-                    CompletableFuture.supplyAsync(() -> carApiClient.getCarById(carId), executor);
+                    CompletableFuture.supplyAsync(() -> carApiClient.getCarById(carId).data(), executor);
             final CompletableFuture<ClientApiClientResponse> clientFuture =
-                    CompletableFuture.supplyAsync(() -> clientApiClient.getMe(bearerToken), executor);
+                    CompletableFuture.supplyAsync(() -> clientApiClient.getMe(bearerToken).data(), executor);
 
             final var all = CompletableFuture.allOf(carFuture, clientFuture);
             all.exceptionally(ex -> {
@@ -86,27 +92,31 @@ public class PurchaseService {
             final var client = clientFuture.join();
 
             // Step 3: assemble sale payload
-            final var vehicleSnapshot = SalesApiVehicleSnapshot.builder()
-                    .id(car.id())
-                    .model(car.model())
-                    .manufacturer(car.manufacturer())
+            final var carSnapshot = SalesApiCarSnapshot.builder()
+                    .model(valueOrFallback(car.model(), "N/A"))
+                    .manufacturer(valueOrFallback(car.manufacturer(), "N/A"))
+                    .externalColor(valueOrFallback(car.externalColor(), "N/A"))
+                    .internalColor(valueOrFallback(car.internalColor(), "N/A"))
                     .manufacturingYear(car.manufacturingYear())
-                    .externalColor(car.externalColor())
-                    .vin(car.vin())
-                    .category(car.category())
+                    .optionalItems(car.optionalItems())
+                    .type(valueOrFallback(car.type(), "N/A"))
+                    .category(valueOrFallback(car.category(), "N/A"))
+                    .vin(normalizeVin(car.vin()))
                     .listedValue(car.listedValue())
+                    .status(valueOrFallback(car.status(), "AVAILABLE").toUpperCase(Locale.ROOT))
                     .build();
+            final var addressSnapshot = toAddressSnapshot(client);
             final var clientSnapshot = SalesApiClientSnapshot.builder()
                     .firstName(client.firstName())
                     .lastName(client.lastName())
-                    .cpf(client.cpf())
+                    .cpf(normalizeCpf(client.cpf()))
                     .email(emailFromJwt)
-                    .phone(client.phone())
+                    .address(addressSnapshot)
                     .build();
-            final var request = SalesApiRegisterRequest.of(carId, vehicleSnapshot, clientSnapshot, "STANDARD_PURCHASE");
+            final var request = SalesApiRegisterRequest.of(carId, clientId, clientSnapshot, carSnapshot);
 
             // Step 4: submit sale (no @Retry)
-            final var sale = salesApiClient.registerSale(request);
+            final var sale = salesApiClient.registerSale(bearerToken, request).data();
             return PurchaseResponse.from(sale);
         }, executor);
     }
@@ -130,19 +140,68 @@ public class PurchaseService {
             if (from != null) params.put("from", from.toString());
             if (to != null) params.put("to", to.toString());
 
-            final var pageResponse = salesApiClient.listSales(bearerToken, params);
+            final var pageResponse = salesApiClient.listSales(bearerToken, params).data();
+            if (pageResponse == null) {
+                throw new DownstreamServiceException("Sales API returned invalid history payload");
+            }
+            final Integer pageNumber = pageResponse.resolvedNumber();
+            final Integer pageSize = pageResponse.resolvedSize();
+            final Long totalElements = pageResponse.resolvedTotalElements();
+            final Integer totalPages = pageResponse.resolvedTotalPages();
+            if (pageNumber == null || pageSize == null || totalElements == null || totalPages == null) {
+                throw new DownstreamServiceException("Sales API returned invalid history payload");
+            }
             final var items = pageResponse.content() == null
                     ? List.<PurchaseResponse>of()
                     : pageResponse.content().stream().map(PurchaseResponse::from).toList();
 
             final var meta = ResponseMeta.paged(
                     requestId,
-                    pageResponse.number(),
-                    pageResponse.size(),
-                    pageResponse.totalElements(),
-                    pageResponse.totalPages()
+                    pageNumber,
+                    pageSize,
+                    totalElements,
+                    totalPages
             );
             return ApiResponse.of(items, meta);
         }, executor);
+    }
+
+    private SalesApiAddressSnapshot toAddressSnapshot(final ClientApiClientResponse client) {
+        final var address = client.address();
+        if (address == null) {
+            throw new IllegalArgumentException("Client profile address is required to complete purchase");
+        }
+
+        return SalesApiAddressSnapshot.builder()
+                .street(valueOrFallback(address.streetName(), "N/A"))
+                .number(valueOrFallback(address.streetNumber(), "N/A"))
+                .complement(null)
+                .neighborhood(valueOrFallback(address.city(), "N/A"))
+                .city(valueOrFallback(address.city(), "N/A"))
+                .state(valueOrFallback(address.state(), "N/A"))
+                .postcode(valueOrFallback(address.postcode(), "N/A"))
+                .build();
+    }
+
+    private String valueOrFallback(final String value, final String fallback) {
+        return (value == null || value.isBlank()) ? fallback : value;
+    }
+
+    private String normalizeCpf(final String cpf) {
+        if (cpf == null) {
+            return null;
+        }
+        return cpf.replaceAll("\\D", "");
+    }
+
+    private String normalizeVin(final String vin) {
+        if (vin == null) {
+            throw new IllegalArgumentException("Selected car has invalid VIN in catalog");
+        }
+        final String normalized = vin.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+        if (normalized.length() != 17) {
+            throw new IllegalArgumentException("Selected car has invalid VIN in catalog");
+        }
+        return normalized;
     }
 }

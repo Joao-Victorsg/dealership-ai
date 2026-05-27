@@ -2,6 +2,7 @@ package br.com.dealership.dealershibff.controller;
 
 import br.com.dealership.dealershibff.dto.request.InventoryFilterRequest;
 import br.com.dealership.dealershibff.dto.response.ApiResponse;
+import br.com.dealership.dealershibff.dto.response.InventoryFilterOptionsResponse;
 import br.com.dealership.dealershibff.dto.response.VehicleResponse;
 import br.com.dealership.dealershibff.service.InventoryService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -41,6 +42,13 @@ public class InventoryController {
     public CompletableFuture<ResponseEntity<ApiResponse<VehicleResponse>>> getById(
             @PathVariable final UUID id) {
         return inventoryService.getById(id)
+                .thenApply(ResponseEntity::ok);
+    }
+
+    @GetMapping("/filter-options")
+    @Operation(summary = "Get available manufacturer and exterior color filters")
+    public CompletableFuture<ResponseEntity<ApiResponse<InventoryFilterOptionsResponse>>> filterOptions() {
+        return inventoryService.filterOptions()
                 .thenApply(ResponseEntity::ok);
     }
 }

@@ -1,7 +1,5 @@
 package br.com.dealership.dealershibff.feign.car.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -18,7 +16,7 @@ public record CarApiCarResponse(
         String status,
         String category,
         String type,
-        @JsonProperty("isNew") Boolean isNew,
+        Boolean isNew,
         BigDecimal kilometers,
         String propulsionType,
         BigDecimal listedValue,

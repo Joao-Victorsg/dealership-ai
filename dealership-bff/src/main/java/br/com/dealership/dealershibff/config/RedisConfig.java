@@ -37,14 +37,16 @@ public class RedisConfig {
                 .build();
         final var defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
                 .entryTtl(DEFAULT_TTL)
+                .computePrefixWith(cacheName -> "dealership-bff::" + cacheName + "::")
                 .serializeKeysWith(SerializationPair.fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(SerializationPair.fromSerializer(jsonSerializer))
                 .disableCachingNullValues();
 
+        // BFF aggregate caches. Do NOT cache downstream DTO responses here — they cause
+        // cross-service class deserialization errors when the remote class is not in BFF's classpath.
+        // Instead, rely on per-service caching (car-api, client-api) and use timeout tolerances.
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
-                .withCacheConfiguration("car-by-id", defaultConfig.entryTtl(Duration.ofMinutes(5)))
-                .withCacheConfiguration("car-listings", defaultConfig.entryTtl(Duration.ofMinutes(5)))
                 .build();
     }
 }

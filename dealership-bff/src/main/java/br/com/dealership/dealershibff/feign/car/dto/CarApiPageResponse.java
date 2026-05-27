@@ -4,9 +4,7 @@ import java.util.List;
 
 public record CarApiPageResponse<T>(
         List<T> content,
-        long totalElements,
-        int totalPages,
-        int number,
-        int size
+        PageMetadata page
 ) {
+    public record PageMetadata(int size, int number, long totalElements, int totalPages) {}
 }

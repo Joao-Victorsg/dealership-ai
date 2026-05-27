@@ -14,15 +14,17 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.client.AuthorizedClientServiceOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.web.DefaultOAuth2AuthorizedClientManager;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientManager;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientProviderBuilder;
-import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.security.web.SecurityFilterChain;
 
 import java.util.ArrayList;
@@ -37,6 +39,12 @@ public class SecurityConfig {
 
     @Value("${app.post-logout-redirect-uri}")
     private String postLogoutRedirectUri;
+    @Value("${KEYCLOAK_EXTERNAL_URL:http://localhost:8080}")
+    private String keycloakExternalUrl;
+    @Value("${KEYCLOAK_REALM:dealership}")
+    private String keycloakRealm;
+    @Value("${KEYCLOAK_CLIENT_ID:dealership-bff}")
+    private String keycloakClientId;
 
     @Bean
     public SecurityFilterChain securityFilterChain(
@@ -63,7 +71,7 @@ public class SecurityConfig {
                             jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
             .logout(logout -> logout
                     .logoutUrl("/api/v1/auth/logout")
-                    .logoutSuccessHandler(oidcLogoutSuccessHandler(clientRegistrationRepository))
+                    .logoutSuccessHandler(keycloakLogoutSuccessHandler())
                     .deleteCookies("SESSION")
                     .invalidateHttpSession(true))
             .addFilterBefore(sessionTokenInjectionFilter, BearerTokenAuthenticationFilter.class)
@@ -74,11 +82,12 @@ public class SecurityConfig {
     }
 
     @Bean
-    public OidcClientInitiatedLogoutSuccessHandler oidcLogoutSuccessHandler(
-            final ClientRegistrationRepository clientRegistrationRepository) {
-        final var handler = new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
-        handler.setPostLogoutRedirectUri(postLogoutRedirectUri);
-        return handler;
+    public LogoutSuccessHandler keycloakLogoutSuccessHandler() {
+        return new KeycloakLogoutSuccessHandler(
+                keycloakExternalUrl,
+                keycloakRealm,
+                postLogoutRedirectUri,
+                keycloakClientId);
     }
 
     @Bean
@@ -91,6 +100,19 @@ public class SecurityConfig {
                 OAuth2AuthorizedClientProviderBuilder.builder()
                         .authorizationCode()
                         .refreshToken()
+                        .build());
+        return manager;
+    }
+
+    @Bean("serviceAuthorizedClientManager")
+    public OAuth2AuthorizedClientManager serviceAuthorizedClientManager(
+            final ClientRegistrationRepository clientRegistrationRepository,
+            final OAuth2AuthorizedClientService authorizedClientService) {
+        final var manager = new AuthorizedClientServiceOAuth2AuthorizedClientManager(
+                clientRegistrationRepository, authorizedClientService);
+        manager.setAuthorizedClientProvider(
+                OAuth2AuthorizedClientProviderBuilder.builder()
+                        .clientCredentials()
                         .build());
         return manager;
     }

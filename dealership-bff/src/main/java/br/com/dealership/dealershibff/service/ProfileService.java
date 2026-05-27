@@ -9,18 +9,23 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import io.github.resilience4j.timelimiter.annotation.TimeLimiter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 @Service
 public class ProfileService {
 
     private final ClientApiClient clientApiClient;
+    private final Executor executor;
 
-    public ProfileService(final ClientApiClient clientApiClient) {
+    public ProfileService(
+            final ClientApiClient clientApiClient,
+            @Qualifier("virtualThreadExecutor") final Executor executor) {
         this.clientApiClient = clientApiClient;
+        this.executor = executor;
     }
 
     @CircuitBreaker(name = "client-api")
@@ -30,9 +35,9 @@ public class ProfileService {
     @Bulkhead(name = "client-api")
     public CompletableFuture<ProfileResponse> getProfile(final String bearerToken, final String emailFromJwt) {
         return CompletableFuture.supplyAsync(() -> {
-            final var client = clientApiClient.getMe(bearerToken);
+            final var client = clientApiClient.getMe(bearerToken).data();
             return ProfileResponse.from(client, emailFromJwt);
-        });
+        }, executor);
     }
 
     @CircuitBreaker(name = "client-api")
@@ -41,18 +46,20 @@ public class ProfileService {
     @TimeLimiter(name = "client-api")
     @Bulkhead(name = "client-api")
     public CompletableFuture<ProfileResponse> updateProfile(
-            final UUID clientId,
+            final String bearerToken,
             final UpdateProfileRequest request,
             final String emailFromJwt) {
         return CompletableFuture.supplyAsync(() -> {
+            final var current = clientApiClient.getMe(bearerToken).data();
             final var updateRequest = new ClientApiUpdateRequest(
                     request.firstName(),
                     request.lastName(),
                     request.phone(),
-                    request.cep()
+                    request.cep(),
+                    null
             );
-            final var updated = clientApiClient.update(clientId, updateRequest);
+            final var updated = clientApiClient.update(current.id(), bearerToken, updateRequest).data();
             return ProfileResponse.from(updated, emailFromJwt);
-        });
+        }, executor);
     }
 }

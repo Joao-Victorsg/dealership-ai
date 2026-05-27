@@ -4,6 +4,7 @@ import br.com.dealership.dealershibff.config.GlobalExceptionHandler;
 import br.com.dealership.dealershibff.domain.exception.DownstreamServiceException;
 import br.com.dealership.dealershibff.domain.exception.NotFoundException;
 import br.com.dealership.dealershibff.dto.response.ApiResponse;
+import br.com.dealership.dealershibff.dto.response.InventoryFilterOptionsResponse;
 import br.com.dealership.dealershibff.dto.response.ResponseMeta;
 import br.com.dealership.dealershibff.dto.response.VehicleResponse;
 import br.com.dealership.dealershibff.service.InventoryService;
@@ -112,5 +113,25 @@ class InventoryControllerTest {
         mockMvc.perform(asyncDispatch(mvcResult))
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(jsonPath("$.error.code").value("DOWNSTREAM_UNAVAILABLE"));
+    }
+
+    @Test
+    void shouldReturn200FilterOptionsResponse() throws Exception {
+        final var meta = ResponseMeta.of("req-id");
+        final var options = new InventoryFilterOptionsResponse(
+                List.of("Honda", "Toyota"),
+                List.of("Black", "White")
+        );
+        final var response = ApiResponse.of(options, meta);
+        when(inventoryService.filterOptions()).thenReturn(CompletableFuture.completedFuture(response));
+
+        final var mvcResult = mockMvc.perform(get("/api/v1/inventory/filter-options"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.manufacturers[0]").value("Honda"))
+                .andExpect(jsonPath("$.data.exteriorColors[1]").value("White"));
     }
 }

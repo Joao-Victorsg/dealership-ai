@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -75,8 +76,8 @@ class AuthControllerTest {
     void shouldReturn201OnRegisterSuccess() throws Exception {
         final var clientResponse = new ClientApiClientResponse(
                 UUID.randomUUID(), "kc-id", "John", "Doe", "***", "+55 11 99988-7766",
-                Instant.now(), null, null);
-        when(authService.register(anyString(), anyString(), anyString(), anyString(), any()))
+                LocalDateTime.now(), null, null);
+        when(authService.register(anyString(), anyString(), anyString(), any()))
                 .thenReturn(CompletableFuture.completedFuture(clientResponse));
 
         final var mvcResult = mockMvc.perform(post("/api/v1/auth/register")

@@ -2,6 +2,7 @@ package br.com.dealership.dealershibff.feign.client;
 
 import br.com.dealership.dealershibff.feign.client.dto.ClientApiClientResponse;
 import br.com.dealership.dealershibff.feign.client.dto.ClientApiCreateRequest;
+import br.com.dealership.dealershibff.feign.client.dto.ClientApiDataResponse;
 import br.com.dealership.dealershibff.feign.client.dto.ClientApiUpdateRequest;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,15 +22,16 @@ import java.util.UUID;
 public interface ClientApiClient {
 
     @GetMapping("/clients/me")
-    ClientApiClientResponse getMe(@RequestHeader("Authorization") String bearerToken);
+    ClientApiDataResponse<ClientApiClientResponse> getMe(@RequestHeader("Authorization") String bearerToken);
 
     @PostMapping("/clients")
-    ClientApiClientResponse create(@RequestHeader("Authorization") String bearerToken,
-                                   @RequestBody ClientApiCreateRequest body);
+    ClientApiDataResponse<ClientApiClientResponse> create(@RequestHeader("Authorization") String bearerToken,
+                                                          @RequestBody ClientApiCreateRequest body);
 
     @PatchMapping("/clients/{id}")
-    ClientApiClientResponse update(
+    ClientApiDataResponse<ClientApiClientResponse> update(
             @PathVariable UUID id,
+            @RequestHeader("Authorization") String bearerToken,
             @RequestBody ClientApiUpdateRequest body
     );
 }

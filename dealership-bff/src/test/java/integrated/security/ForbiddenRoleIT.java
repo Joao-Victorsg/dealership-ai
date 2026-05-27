@@ -1,17 +1,26 @@
 package integrated.security;
 
+import com.github.tomakehurst.wiremock.client.WireMock;
 import integrated.BaseIT;
+import integrated.EnvironmentInitializer;
 import integrated.utils.JwtTestUtils;
 import io.restassured.RestAssured;
-import io.restassured.http.ContentType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+
+import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.get;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 
 class ForbiddenRoleIT extends BaseIT {
 
     @Test
     void shouldReturn403ForProfileWithAdminRole() {
+        EnvironmentInitializer.getClientApiMock().stubFor(
+                get(urlPathEqualTo("/clients/me"))
+                        .willReturn(aResponse().withStatus(403)));
+
         final var adminToken = JwtTestUtils.generateToken("admin-sub", List.of("ADMIN"), "admin@test.com");
 
         RestAssured.given()

@@ -1,5 +1,6 @@
 package br.com.dealership.dealershibff.feign.sales;
 
+import br.com.dealership.dealershibff.feign.sales.dto.SalesApiDataResponse;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiPageResponse;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiRegisterRequest;
 import br.com.dealership.dealershibff.feign.sales.dto.SalesApiSaleResponse;
@@ -20,10 +21,12 @@ import java.util.Map;
 public interface SalesApiClient {
 
     @PostMapping("/api/v1/sales")
-    SalesApiSaleResponse registerSale(@RequestBody SalesApiRegisterRequest body);
+    SalesApiDataResponse<SalesApiSaleResponse> registerSale(
+            @RequestHeader("Authorization") String token,
+            @RequestBody SalesApiRegisterRequest body);
 
-    @GetMapping("/api/v1/sales/me")
-    SalesApiPageResponse<SalesApiSaleResponse> listSales(
+    @GetMapping("/api/v1/sales")
+    SalesApiDataResponse<SalesApiPageResponse<SalesApiSaleResponse>> listSales(
             @RequestHeader("Authorization") String token,
             @SpringQueryMap Map<String, Object> params);
 }

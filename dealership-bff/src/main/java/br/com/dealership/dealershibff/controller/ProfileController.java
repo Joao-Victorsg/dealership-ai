@@ -10,7 +10,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.MDC;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -18,12 +17,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 @RestController
 @RequestMapping("/api/v1/profile")
-@PreAuthorize("hasRole('CLIENT')")
 @Tag(name = "Profile", description = "Client profile view and update")
 public class ProfileController {
 
@@ -49,9 +46,9 @@ public class ProfileController {
     public CompletableFuture<ResponseEntity<ApiResponse<ProfileResponse>>> updateProfile(
             @RequestBody @Valid final UpdateProfileRequest request,
             final JwtAuthenticationToken authentication) {
+        final String bearerToken = "Bearer " + authentication.getToken().getTokenValue();
         final String email = authentication.getToken().getClaimAsString("email");
-        final UUID clientId = UUID.fromString(authentication.getToken().getSubject());
-        return profileService.updateProfile(clientId, request, email)
+        return profileService.updateProfile(bearerToken, request, email)
                 .thenApply(profile -> ResponseEntity.ok(
                         ApiResponse.of(profile, ResponseMeta.of(getRequestId()))));
     }

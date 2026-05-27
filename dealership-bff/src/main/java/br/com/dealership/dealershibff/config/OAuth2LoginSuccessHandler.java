@@ -6,7 +6,7 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -24,15 +24,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private static final String REGISTRATION_FLOW_ID = "keycloak-register";
 
-    private final OAuth2AuthorizedClientService clientService;
+    private final OAuth2AuthorizedClientRepository authorizedClientRepository;
     private final String postLoginRedirectUri;
     private final String postRegistrationRedirectUri;
 
     public OAuth2LoginSuccessHandler(
-            final OAuth2AuthorizedClientService clientService,
+            final OAuth2AuthorizedClientRepository authorizedClientRepository,
             @Value("${app.post-login-redirect-uri}") final String postLoginRedirectUri,
             @Value("${app.post-registration-redirect-uri}") final String postRegistrationRedirectUri) {
-        this.clientService = clientService;
+        this.authorizedClientRepository = authorizedClientRepository;
         this.postLoginRedirectUri = postLoginRedirectUri;
         this.postRegistrationRedirectUri = postRegistrationRedirectUri;
     }
@@ -46,13 +46,15 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         final var oauthToken = (OAuth2AuthenticationToken) authentication;
         final boolean isRegistrationFlow = REGISTRATION_FLOW_ID.equals(
                 oauthToken.getAuthorizedClientRegistrationId());
+        final String redirectUri = isRegistrationFlow ? postRegistrationRedirectUri : postLoginRedirectUri;
 
-        final OAuth2AuthorizedClient client = clientService.loadAuthorizedClient(
+        final OAuth2AuthorizedClient client = authorizedClientRepository.loadAuthorizedClient(
                 oauthToken.getAuthorizedClientRegistrationId(),
-                oauthToken.getName());
+                oauthToken,
+                request);
 
         if (client == null) {
-            response.sendRedirect(isRegistrationFlow ? postRegistrationRedirectUri : postLoginRedirectUri);
+            response.sendRedirect(redirectUri);
             return;
         }
 
@@ -69,6 +71,6 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             session.setAttribute(SESSION_ID_TOKEN, oidcUser.getIdToken().getTokenValue());
         }
 
-        response.sendRedirect(isRegistrationFlow ? postRegistrationRedirectUri : postLoginRedirectUri);
+        response.sendRedirect(redirectUri);
     }
 }

@@ -17,13 +17,13 @@ public record AddressView(
     public static AddressView from(final ClientApiAddressResponse source) {
         if (source == null) return null;
         return AddressView.builder()
-                .street(source.street())
-                .number(source.number())
-                .complement(source.complement())
-                .neighborhood(source.neighborhood())
+                .street(source.streetName())
+                .number(source.streetNumber())
+                .complement(null)
+                .neighborhood(null)
                 .city(source.city())
                 .state(source.state())
-                .cep(source.cep())
+                .cep(source.postcode())
                 .build();
     }
 }

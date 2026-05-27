@@ -9,7 +9,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizedClientRepository;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.OAuth2RefreshToken;
@@ -31,7 +31,7 @@ import static org.mockito.Mockito.*;
 class OAuth2LoginSuccessHandlerTest {
 
     @Mock
-    private OAuth2AuthorizedClientService clientService;
+    private OAuth2AuthorizedClientRepository authorizedClientRepository;
     @Mock
     private HttpServletRequest request;
     @Mock
@@ -48,13 +48,13 @@ class OAuth2LoginSuccessHandlerTest {
     private OAuth2User oauthUser;
 
     private static final String POST_LOGIN_URI = "http://localhost:3000";
-    private static final String POST_REGISTRATION_URI = "http://localhost:3000/register/complete";
+    private static final String POST_REGISTRATION_URI = "http://localhost:3000/complete-registration";
 
     private OAuth2LoginSuccessHandler handler;
 
     @BeforeEach
     void setUp() {
-        handler = new OAuth2LoginSuccessHandler(clientService, POST_LOGIN_URI, POST_REGISTRATION_URI);
+        handler = new OAuth2LoginSuccessHandler(authorizedClientRepository, POST_LOGIN_URI, POST_REGISTRATION_URI);
     }
 
     @Test
@@ -66,8 +66,7 @@ class OAuth2LoginSuccessHandlerTest {
         when(refreshToken.getTokenValue()).thenReturn("refresh-token-value");
         when(authorizedClient.getAccessToken()).thenReturn(accessToken);
         when(authorizedClient.getRefreshToken()).thenReturn(refreshToken);
-        when(oauthUser.getName()).thenReturn("sub-123");
-        when(clientService.loadAuthorizedClient("keycloak", "sub-123")).thenReturn(authorizedClient);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak"), any(), eq(request))).thenReturn(authorizedClient);
 
         final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -94,7 +93,7 @@ class OAuth2LoginSuccessHandlerTest {
                 .build();
         final var oidcUser = new DefaultOidcUser(Collections.emptyList(), idToken);
         final var auth = new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
-        when(clientService.loadAuthorizedClient("keycloak", oidcUser.getName())).thenReturn(authorizedClient);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak"), any(), eq(request))).thenReturn(authorizedClient);
 
         handler.onAuthenticationSuccess(request, response, auth);
 
@@ -108,8 +107,7 @@ class OAuth2LoginSuccessHandlerTest {
         when(accessToken.getExpiresAt()).thenReturn(Instant.now().plusSeconds(3600));
         when(authorizedClient.getAccessToken()).thenReturn(accessToken);
         when(authorizedClient.getRefreshToken()).thenReturn(null);
-        when(oauthUser.getName()).thenReturn("sub-123");
-        when(clientService.loadAuthorizedClient("keycloak", "sub-123")).thenReturn(authorizedClient);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak"), any(), eq(request))).thenReturn(authorizedClient);
 
         final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -119,8 +117,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     @Test
     void shouldRedirectImmediatelyWhenAuthorizedClientIsNull() throws IOException {
-        when(oauthUser.getName()).thenReturn("sub-123");
-        when(clientService.loadAuthorizedClient("keycloak", "sub-123")).thenReturn(null);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak"), any(), eq(request))).thenReturn(null);
 
         final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -139,9 +136,8 @@ class OAuth2LoginSuccessHandlerTest {
         when(authorizedClient.getRefreshToken()).thenReturn(null);
 
         final OidcUser oidcUser = mock(OidcUser.class);
-        when(oidcUser.getName()).thenReturn("sub-123");
         when(oidcUser.getIdToken()).thenReturn(null);
-        when(clientService.loadAuthorizedClient("keycloak", "sub-123")).thenReturn(authorizedClient);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak"), any(), eq(request))).thenReturn(authorizedClient);
 
         final var auth = new OAuth2AuthenticationToken(oidcUser, Collections.emptyList(), "keycloak");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -158,8 +154,7 @@ class OAuth2LoginSuccessHandlerTest {
         when(accessToken.getExpiresAt()).thenReturn(expiresAt);
         when(authorizedClient.getAccessToken()).thenReturn(accessToken);
         when(authorizedClient.getRefreshToken()).thenReturn(null);
-        when(oauthUser.getName()).thenReturn("sub-123");
-        when(clientService.loadAuthorizedClient("keycloak-register", "sub-123")).thenReturn(authorizedClient);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak-register"), any(), eq(request))).thenReturn(authorizedClient);
 
         final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak-register");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -170,8 +165,7 @@ class OAuth2LoginSuccessHandlerTest {
 
     @Test
     void shouldRedirectToRegistrationUriWhenAuthorizedClientIsNullInRegistrationFlow() throws IOException {
-        when(oauthUser.getName()).thenReturn("sub-123");
-        when(clientService.loadAuthorizedClient("keycloak-register", "sub-123")).thenReturn(null);
+        when(authorizedClientRepository.loadAuthorizedClient(eq("keycloak-register"), any(), eq(request))).thenReturn(null);
 
         final var auth = new OAuth2AuthenticationToken(oauthUser, Collections.emptyList(), "keycloak-register");
         handler.onAuthenticationSuccess(request, response, auth);
@@ -179,4 +173,5 @@ class OAuth2LoginSuccessHandlerTest {
         verify(session, never()).setAttribute(any(), any());
         verify(response).sendRedirect(POST_REGISTRATION_URI);
     }
+
 }

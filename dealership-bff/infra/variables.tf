@@ -5,21 +5,29 @@ variable "image_tag" {
 }
 
 variable "redis_host" {
-  description = "ElastiCache Redis cluster endpoint"
+  description = "ElastiCache Redis cluster endpoint override (optional)"
   type        = string
-  default     = "localhost.localstack.cloud"
+  default     = null
+  nullable    = true
 }
 
 variable "redis_port" {
-  description = "ElastiCache Redis port"
+  description = "ElastiCache Redis port override (optional)"
   type        = number
-  default     = 4511
+  default     = null
+  nullable    = true
 }
 
 variable "keycloak_base_url" {
-  description = "Base URL of the Keycloak server (e.g. http://keycloak:8080)"
+  description = "Internal Keycloak URL for server-to-server calls (token exchange, JWK, userinfo)"
   type        = string
   default     = "http://keycloak:8080"
+}
+
+variable "keycloak_external_url" {
+  description = "Browser-facing Keycloak URL embedded in the OAuth2 authorization redirect (must be resolvable by the end-user's browser)"
+  type        = string
+  default     = "https://auth.localhost:4443"
 }
 
 variable "car_api_base_url" {
@@ -56,24 +64,55 @@ variable "keycloak_client_secret" {
   description = "Keycloak client secret for the BFF OAuth2 client (both login and registration flows)"
   type        = string
   sensitive   = true
+  default     = "dealership-bff-secret"
+}
+
+variable "keycloak_system_client_id" {
+  description = "Keycloak system client ID used for machine-to-machine calls from BFF to downstream APIs"
+  type        = string
+  default     = "dealership-system"
+}
+
+variable "keycloak_system_client_secret" {
+  description = "Keycloak system client secret used for machine-to-machine calls from BFF to downstream APIs"
+  type        = string
+  sensitive   = true
+  default     = "dealership-system-secret"
 }
 
 variable "app_post_login_redirect_uri" {
   description = "Frontend URL to redirect to after successful login (e.g. https://app.example.com)"
   type        = string
-  default     = "http://localhost:3000"
+  default     = "https://app.localhost:4443"
 }
 
 variable "app_post_logout_redirect_uri" {
   description = "Frontend URL to redirect to after logout (e.g. https://app.example.com)"
   type        = string
-  default     = "http://localhost:3000"
+  default     = "https://app.localhost:4443/"
 }
 
 variable "app_post_registration_redirect_uri" {
-  description = "Frontend URL to redirect to after Keycloak registration (e.g. https://app.example.com/register/complete)"
+  description = "Frontend URL to redirect to after Keycloak registration (e.g. https://app.example.com/complete-registration)"
   type        = string
-  default     = "http://localhost:3000/register/complete"
+  default     = "https://app.localhost:4443/complete-registration"
+}
+
+variable "session_cookie_secure" {
+  description = "Whether to mark BFF session cookie as Secure"
+  type        = bool
+  default     = true
+}
+
+variable "session_cookie_same_site" {
+  description = "SameSite policy for BFF session cookie (Strict, Lax, or None)"
+  type        = string
+  default     = "lax"
+
+  validation {
+    condition     = contains(["strict", "lax", "none"], lower(var.session_cookie_same_site))
+    error_message = "session_cookie_same_site must be one of: strict, lax, none."
+  }
 }
 
 variable "new_relic_license_key" {

@@ -1,6 +1,8 @@
 package br.com.dealership.dealershibff.feign.client.dto;
 
-import java.time.Instant;
+import com.fasterxml.jackson.annotation.JsonAlias;
+
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 public record ClientApiClientResponse(
@@ -9,9 +11,10 @@ public record ClientApiClientResponse(
         String firstName,
         String lastName,
         String cpf,
+        @JsonAlias({"phone", "phoneNumber"})
         String phone,
-        Instant createdAt,
-        Instant deletedAt,
+        LocalDateTime createdAt,
+        LocalDateTime deletedAt,
         ClientApiAddressResponse address
 ) {
 }
