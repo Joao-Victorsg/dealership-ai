@@ -36,15 +36,17 @@ variable "db_password" {
 }
 
 variable "redis_host" {
-  description = "ElastiCache Redis cluster endpoint"
+  description = "ElastiCache Redis cluster endpoint override (optional)"
   type        = string
-  default     = "localhost.localstack.cloud"
+  default     = null
+  nullable    = true
 }
 
 variable "redis_port" {
-  description = "ElastiCache Redis port"
+  description = "ElastiCache Redis port override (optional)"
   type        = number
-  default     = 4511
+  default     = null
+  nullable    = true
 }
 
 variable "jwt_issuer_uri" {

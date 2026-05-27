@@ -82,6 +82,7 @@ class CarFilterRequestTest {
                 .category(CarCategory.SEDAN)
                 .propulsionType(PropulsionType.ELECTRIC)
                 .manufacturer("Tesla")
+                .externalColor("White")
                 .isNew(false)
                 .minValue(BigDecimal.valueOf(30000))
                 .maxValue(BigDecimal.valueOf(80000))
@@ -94,6 +95,7 @@ class CarFilterRequestTest {
         assertEquals(CarStatus.AVAILABLE, filter.status());
         assertEquals(CarCategory.SEDAN, filter.category());
         assertEquals("Tesla", filter.manufacturer());
+        assertEquals("White", filter.externalColor());
     }
 
     @Test

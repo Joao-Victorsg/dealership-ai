@@ -9,6 +9,7 @@ import br.com.dealership.car.api.domain.exception.SoldCarModificationException;
 import br.com.dealership.car.api.dto.request.CarFilterRequest;
 import br.com.dealership.car.api.dto.request.CreateCarRequest;
 import br.com.dealership.car.api.dto.request.UpdateCarRequest;
+import br.com.dealership.car.api.dto.response.CarFilterOptionsResponse;
 import br.com.dealership.car.api.dto.response.CarResponse;
 import br.com.dealership.car.api.service.CarService;
 import org.junit.jupiter.api.BeforeEach;
@@ -156,6 +157,20 @@ class CarControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.totalElements").value(0));
     }
+
+    @Test
+    void shouldReturnFilterOptionsSuccessfully() throws Exception {
+        when(carService.getFilterOptions()).thenReturn(new CarFilterOptionsResponse(
+                List.of("Honda", "Toyota"),
+                List.of("Black", "White")
+        ));
+
+        mockMvc.perform(get("/api/v1/cars/filter-options"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.manufacturers[0]").value("Honda"))
+                .andExpect(jsonPath("$.data.exteriorColors[1]").value("White"));
+    }
+
     @Test
     void shouldGetCarByIdSuccessfully() throws Exception {
         var carId = UUID.randomUUID();

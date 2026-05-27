@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItems;
 
 class CarControllerIT extends BaseIT {
 
@@ -95,6 +96,36 @@ class CarControllerIT extends BaseIT {
                 .statusCode(HttpStatus.OK.value())
                 .body("data.content", notNullValue())
                 .body("data.page.totalElements", greaterThanOrEqualTo(1));
+    }
+
+    @DisplayName("Given cars with the same manufacturer and color in different cases, then filter options are distinct and normalized")
+    @Test
+    void givenCarsThenFilterOptionsReturnDistinctValues() {
+        createCar(createCarJson("FOPT01234567890AB", "Honda", "Black"));
+        createCar(createCarJson("FOPT11234567890AB", "honda", " black "));
+        createCar(createCarJson("FOPT21234567890AB", "Toyota", "White"));
+
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .when().get(URL + "/filter-options")
+                .then()
+                .statusCode(HttpStatus.OK.value())
+                .body("data.manufacturers", hasItems("Honda", "Toyota"))
+                .body("data.exteriorColors", hasItems("Black", "White"));
+    }
+
+    @DisplayName("Given an exterior color filter, then list cars applies it")
+    @Test
+    void givenExteriorColorFilterThenListCarsAppliesIt() {
+        createCar(createCarJson("COLR01234567890AB", "Tesla", "Pearl Blue"));
+
+        RestAssured.given()
+                .contentType(ContentType.JSON)
+                .queryParam("externalColor", "pearl blue")
+                .when().get(URL)
+                .then()
+                .statusCode(HttpStatus.OK.value())
+                .body("data.content.externalColor", hasItems("Pearl Blue"));
     }
 
     @DisplayName("Given a valid car ID, then get car returns 200")
@@ -256,12 +287,16 @@ class CarControllerIT extends BaseIT {
     }
 
     private String createCarJson(String vin) {
+        return createCarJson(vin, "Tesla", "White");
+    }
+
+    private String createCarJson(String vin, String manufacturer, String externalColor) {
         return """
                 {
                     "model": "Tesla Model 3",
                     "manufacturingYear": 2022,
-                    "manufacturer": "Tesla",
-                    "externalColor": "White",
+                    "manufacturer": "%s",
+                    "externalColor": "%s",
                     "internalColor": "Black",
                     "vin": "%s",
                     "status": "AVAILABLE",
@@ -271,6 +306,6 @@ class CarControllerIT extends BaseIT {
                     "propulsionType": "ELECTRIC",
                     "listedValue": 50000.00
                 }
-                """.formatted(vin);
+                """.formatted(manufacturer, externalColor, vin);
     }
 }

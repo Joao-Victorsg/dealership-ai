@@ -26,6 +26,7 @@ import org.springframework.data.jpa.domain.Specification;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -256,6 +257,17 @@ class CarServiceTest {
 
         assertEquals(1, result.getTotalElements());
         verify(carRepository).findAll(any(Specification.class), any(org.springframework.data.domain.Pageable.class));
+    }
+
+    @Test
+    void shouldReturnNormalizedDistinctFilterOptions() {
+        when(carRepository.findDistinctManufacturers()).thenReturn(new ArrayList<>(List.of("  tesla ", "Tesla", "Honda")));
+        when(carRepository.findDistinctExteriorColors()).thenReturn(new ArrayList<>(List.of("black", " Black ", "White")));
+
+        final var options = carService.getFilterOptions();
+
+        assertEquals(List.of("Honda", "Tesla"), options.manufacturers());
+        assertEquals(List.of("Black", "White"), options.exteriorColors());
     }
 
     @Test

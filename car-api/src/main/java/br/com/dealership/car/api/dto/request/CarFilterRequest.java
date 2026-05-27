@@ -15,6 +15,7 @@ public record CarFilterRequest(
         CarCategory category,
         PropulsionType propulsionType,
         String manufacturer,
+        String externalColor,
         Boolean isNew,
         BigDecimal minValue,
         BigDecimal maxValue,

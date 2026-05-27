@@ -1,6 +1,7 @@
 package br.com.dealership.car.api.service;
 
 import br.com.dealership.car.api.dto.request.CarFilterRequest;
+import br.com.dealership.car.api.dto.response.CarFilterOptionsResponse;
 import br.com.dealership.car.api.dto.response.CarResponse;
 import br.com.dealership.car.api.dto.request.CreateCarRequest;
 import br.com.dealership.car.api.dto.response.PresignedUrlResponse;
@@ -24,6 +25,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class CarService {
@@ -39,7 +45,10 @@ public class CarService {
     }
 
     @Transactional
-    @CacheEvict(value = "car-listings", allEntries = true)
+    @Caching(evict = {
+            @CacheEvict(value = "car-listings", allEntries = true),
+            @CacheEvict(value = "car-filter-options", allEntries = true)
+    })
     public CarResponse registerCar(CreateCarRequest request) {
         if (carRepository.existsByVin(request.vin())) {
             throw new DuplicateVinException(request.vin());
@@ -75,10 +84,14 @@ public class CarService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(
-            value = "car-listings",
-            key = "#filter.toString() + '-' + #pageable.pageNumber + '-' + #pageable.pageSize"
-    )
+    @Cacheable(value = "car-filter-options")
+    public CarFilterOptionsResponse getFilterOptions() {
+        final List<String> manufacturers = normalizeOptions(carRepository.findDistinctManufacturers());
+        final List<String> exteriorColors = normalizeOptions(carRepository.findDistinctExteriorColors());
+        return new CarFilterOptionsResponse(manufacturers, exteriorColors);
+    }
+
+    @Transactional(readOnly = true)
     public Page<CarResponse> listCars(CarFilterRequest filter, Pageable pageable) {
         var sort = Sort.by(filter.sortDirection().toSpringDirection(), filter.sortBy().fieldName());
         var pageRequest = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
@@ -89,7 +102,8 @@ public class CarService {
     @Transactional
     @Caching(evict = {
             @CacheEvict(value = "car-by-id", key = "#id"),
-            @CacheEvict(value = "car-listings", allEntries = true)
+            @CacheEvict(value = "car-listings", allEntries = true),
+            @CacheEvict(value = "car-filter-options", allEntries = true)
     })
     public CarResponse updateCar(UUID id, UpdateCarRequest request) {
         var car = carRepository.findById(id)
@@ -127,5 +141,21 @@ public class CarService {
             throw new CarNotFoundException(carId);
         }
         return s3Service.generatePresignedPutUrl(carId, contentType);
+    }
+
+    private List<String> normalizeOptions(final List<String> values) {
+        final Map<String, String> optionsByCanonical = values.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .collect(Collectors.toMap(
+                        value -> value.toLowerCase(Locale.ROOT),
+                        Function.identity(),
+                        (left, right) -> left.compareTo(right) <= 0 ? left : right
+                ));
+
+        return optionsByCanonical.values().stream()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 }

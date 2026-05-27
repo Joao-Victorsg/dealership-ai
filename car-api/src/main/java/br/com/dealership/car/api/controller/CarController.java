@@ -1,6 +1,7 @@
 package br.com.dealership.car.api.controller;
 
 import br.com.dealership.car.api.dto.request.CarFilterRequest;
+import br.com.dealership.car.api.dto.response.CarFilterOptionsResponse;
 import br.com.dealership.car.api.dto.response.CarResponse;
 import br.com.dealership.car.api.dto.request.CreateCarRequest;
 import br.com.dealership.car.api.dto.response.Response;
@@ -66,6 +67,13 @@ public class CarController {
     ) {
         var result = carService.listCars(filter, pageable);
         return ResponseEntity.ok(Response.of(result));
+    }
+
+    @GetMapping("/filter-options")
+    @Operation(summary = "List available manufacturer and exterior color options")
+    @ApiResponse(responseCode = "200", description = "Filter options retrieved successfully")
+    public ResponseEntity<Response<CarFilterOptionsResponse>> getFilterOptions() {
+        return ResponseEntity.ok(Response.of(carService.getFilterOptions()));
     }
 
     @GetMapping("/{id}")

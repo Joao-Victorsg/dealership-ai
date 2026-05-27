@@ -8,6 +8,11 @@ resource "aws_cloudwatch_log_group" "car_api" {
   }
 }
 
+locals {
+  resolved_redis_host = coalesce(var.redis_host, data.terraform_remote_state.elasticache.outputs.car_redis_endpoint)
+  resolved_redis_port = coalesce(var.redis_port, tonumber(data.terraform_remote_state.elasticache.outputs.car_redis_port))
+}
+
 resource "aws_ecs_task_definition" "car_api" {
   family                   = "car-api"
   network_mode             = "awsvpc"
@@ -33,18 +38,18 @@ resource "aws_ecs_task_definition" "car_api" {
       ]
 
       environment = [
-        { name = "SPRING_DATASOURCE_URL",      value = "jdbc:postgresql://${var.db_host}:${var.db_port}/${var.db_name}" },
+        { name = "SPRING_DATASOURCE_URL", value = "jdbc:postgresql://${var.db_host}:${var.db_port}/${var.db_name}" },
         { name = "SPRING_DATASOURCE_USERNAME", value = var.db_username },
         { name = "SPRING_DATASOURCE_PASSWORD", value = var.db_password },
-        { name = "REDIS_HOST",                 value = var.redis_host },
-        { name = "REDIS_PORT",                 value = tostring(var.redis_port) },
-        { name = "JWT_ISSUER_URI",             value = var.jwt_issuer_uri },
-        { name = "S3_BUCKET",                  value = var.s3_bucket },
-        { name = "S3_REGION",                  value = var.s3_region },
-        { name = "S3_ENDPOINT",                value = var.s3_endpoint },
-        { name = "S3_PRESIGNED_URL_TTL",       value = tostring(var.s3_presigned_url_ttl) },
-        { name = "NEW_RELIC_LICENSE_KEY",      value = var.new_relic_license_key },
-        { name = "NEW_RELIC_APP_NAME",         value = var.new_relic_app_name }
+        { name = "REDIS_HOST", value = local.resolved_redis_host },
+        { name = "REDIS_PORT", value = tostring(local.resolved_redis_port) },
+        { name = "JWT_ISSUER_URI", value = var.jwt_issuer_uri },
+        { name = "S3_BUCKET", value = var.s3_bucket },
+        { name = "S3_REGION", value = var.s3_region },
+        { name = "S3_ENDPOINT", value = var.s3_endpoint },
+        { name = "S3_PRESIGNED_URL_TTL", value = tostring(var.s3_presigned_url_ttl) },
+        { name = "NEW_RELIC_LICENSE_KEY", value = var.new_relic_license_key },
+        { name = "NEW_RELIC_APP_NAME", value = var.new_relic_app_name }
       ]
 
       logConfiguration = {

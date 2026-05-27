@@ -24,3 +24,11 @@ data "aws_lb" "nlb" {
 data "aws_ecs_cluster" "cluster" {
   cluster_name = "api-dealership-ai"
 }
+
+data "terraform_remote_state" "elasticache" {
+  backend = "local"
+
+  config = {
+    path = "${path.module}/../../infra-elasticache/terraform.tfstate"
+  }
+}

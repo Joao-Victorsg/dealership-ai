@@ -21,6 +21,7 @@ public final class CarSpecification {
                 .and(hasCategory(filter.category()))
                 .and(hasPropulsionType(filter.propulsionType()))
                 .and(hasManufacturer(filter.manufacturer()))
+                .and(hasExternalColor(filter.externalColor()))
                 .and(isNew(filter.isNew()))
                 .and(valueBetween(filter.minValue(), filter.maxValue()))
                 .and(yearBetween(filter.minYear(), filter.maxYear()));
@@ -45,6 +46,12 @@ public final class CarSpecification {
         return (root, _, cb) -> manufacturer == null || manufacturer.isBlank() ? null
                 : cb.like(cb.lower(root.get(Car_.manufacturer)),
                           "%" + manufacturer.toLowerCase() + "%");
+    }
+
+    private static Specification<Car> hasExternalColor(String externalColor) {
+        return (root, _, cb) -> externalColor == null || externalColor.isBlank() ? null
+                : cb.like(cb.lower(root.get(Car_.externalColor)),
+                          "%" + externalColor.toLowerCase() + "%");
     }
 
     private static Specification<Car> isNew(Boolean isNew) {
