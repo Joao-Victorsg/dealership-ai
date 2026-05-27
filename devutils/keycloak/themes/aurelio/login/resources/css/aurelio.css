@@ -1,0 +1,97 @@
+@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Geist:wght@400;500;600&display=swap");
+
+:root {
+  --aurelio-background: oklch(0.985 0.004 85);
+  --aurelio-foreground: oklch(0.18 0.01 60);
+  --aurelio-surface: oklch(0.975 0.005 85);
+  --aurelio-border: oklch(0.88 0.008 75);
+  --aurelio-border-strong: oklch(0.78 0.01 70);
+  --aurelio-primary: oklch(0.42 0.13 25);
+  --aurelio-primary-foreground: oklch(0.985 0.004 85);
+  --aurelio-muted: oklch(0.45 0.012 60);
+}
+
+body,
+.login-pf,
+.login-pf body {
+  background: var(--aurelio-background) !important;
+  color: var(--aurelio-foreground) !important;
+  font-family: "Geist", "Segoe UI", sans-serif !important;
+}
+
+#kc-page-title,
+#kc-header-wrapper,
+.login-pf-header h1,
+.pf-v5-c-title {
+  color: var(--aurelio-foreground) !important;
+  font-family: "Bricolage Grotesque", "Segoe UI", sans-serif !important;
+  letter-spacing: -0.02em;
+}
+
+#kc-header-wrapper {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.card-pf,
+.pf-v5-c-card,
+.login-pf-page .card-pf {
+  border-radius: 12px !important;
+  border: 1px solid var(--aurelio-border) !important;
+  box-shadow: none !important;
+  background: var(--aurelio-surface) !important;
+}
+
+.pf-v5-c-form-control,
+.form-control {
+  border-radius: 8px !important;
+  border: 1px solid var(--aurelio-border) !important;
+  background: white !important;
+  color: var(--aurelio-foreground) !important;
+}
+
+.pf-v5-c-form-control:focus,
+.form-control:focus {
+  border-color: var(--aurelio-primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--aurelio-primary) 25%, transparent) !important;
+}
+
+.pf-v5-c-button.pf-m-primary,
+#kc-login,
+input[type="submit"] {
+  border-radius: 8px !important;
+  border: 1px solid var(--aurelio-primary) !important;
+  background: var(--aurelio-primary) !important;
+  color: var(--aurelio-primary-foreground) !important;
+  font-weight: 600 !important;
+}
+
+.pf-v5-c-button.pf-m-primary:hover,
+#kc-login:hover,
+input[type="submit"]:hover {
+  filter: brightness(0.94);
+}
+
+a {
+  color: var(--aurelio-primary) !important;
+}
+
+.pf-v5-c-login__main-header,
+#kc-form-options,
+#kc-info {
+  border-color: var(--aurelio-border) !important;
+}
+
+#kc-registration-container,
+#kc-info-wrapper {
+  color: var(--aurelio-muted) !important;
+}
+
+.pf-v5-c-alert {
+  border-radius: 8px !important;
+}
+
+.pf-v5-c-check__label,
+label {
+  color: var(--aurelio-foreground) !important;
+}

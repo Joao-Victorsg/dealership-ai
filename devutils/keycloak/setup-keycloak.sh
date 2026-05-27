@@ -25,6 +25,8 @@ KEYCLOAK_URL="http://localhost:8180"
 ADMIN_USER="admin"
 ADMIN_PASSWORD="admin"
 REALM="dealership"
+SELF_REGISTERED_CLIENT_GROUP="self-registered-client"
+SELF_REGISTRATION_CLIENT_GROUP_LISTENER="dealership-self-registration-client-group"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -86,8 +88,23 @@ if [[ "$REALM_STATUS" == "404" ]]; then
   "realm": "${REALM}",
   "displayName": "Dealership",
   "enabled": true,
+  "loginTheme": "aurelio-keycloakify",
+  "loginWithEmailAllowed": true,
+  "registrationEmailAsUsername": true,
+  "editUsernameAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "registrationAllowed": true,
+  "resetPasswordAllowed": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en"],
+  "defaultLocale": "en",
   "accessTokenLifespan": 3600,
   "ssoSessionMaxLifespan": 36000,
+  "eventsEnabled": true,
+  "eventsListeners": [
+    "jboss-logging",
+    "${SELF_REGISTRATION_CLIENT_GROUP_LISTENER}"
+  ],
   "verifyEmail": true,
   "smtpServer": {
     "host": "smtp4dev-ai",
@@ -106,6 +123,21 @@ else
   kc PUT "realms/${REALM}" -d @- <<EOF
 {
   "realm": "${REALM}",
+  "loginTheme": "aurelio-keycloakify",
+  "loginWithEmailAllowed": true,
+  "registrationEmailAsUsername": true,
+  "editUsernameAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "registrationAllowed": true,
+  "resetPasswordAllowed": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": ["en"],
+  "defaultLocale": "en",
+  "eventsEnabled": true,
+  "eventsListeners": [
+    "jboss-logging",
+    "${SELF_REGISTRATION_CLIENT_GROUP_LISTENER}"
+  ],
   "verifyEmail": true,
   "smtpServer": {
     "host": "smtp4dev-ai",
@@ -120,6 +152,68 @@ else
 EOF
   log "SMTP config updated."
 fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Keep registration minimal (email + password) and leave profile data
+#    collection to the BFF/client-api registration flow.
+#
+#    - Username is mapped from email (registrationEmailAsUsername=true).
+#    - firstName/lastName are hidden from the end-user profile forms.
+# ─────────────────────────────────────────────────────────────────────────────
+log "Updating user profile for minimal self-registration (email only) ..."
+kc PUT "realms/${REALM}/users/profile" -d @- <<EOF >/dev/null
+{
+  "attributes": [
+    {
+      "name": "username",
+      "displayName": "\${username}",
+      "validations": {
+        "length": { "min": 3, "max": 255 },
+        "username-prohibited-characters": {},
+        "up-username-not-idn-homograph": {}
+      },
+      "permissions": { "view": ["admin"], "edit": ["admin"] },
+      "multivalued": false
+    },
+    {
+      "name": "email",
+      "displayName": "\${email}",
+      "validations": { "email": {}, "length": { "max": 255 } },
+      "required": { "roles": ["user"] },
+      "permissions": { "view": ["admin", "user"], "edit": ["admin", "user"] },
+      "multivalued": false
+    },
+    {
+      "name": "firstName",
+      "displayName": "\${firstName}",
+      "validations": {
+        "length": { "max": 255 },
+        "person-name-prohibited-characters": {}
+      },
+      "permissions": { "view": ["admin"], "edit": ["admin"] },
+      "multivalued": false
+    },
+    {
+      "name": "lastName",
+      "displayName": "\${lastName}",
+      "validations": {
+        "length": { "max": 255 },
+        "person-name-prohibited-characters": {}
+      },
+      "permissions": { "view": ["admin"], "edit": ["admin"] },
+      "multivalued": false
+    }
+  ],
+  "groups": [
+    {
+      "name": "user-metadata",
+      "displayHeader": "User metadata",
+      "displayDescription": "Attributes, which refer to user metadata"
+    }
+  ]
+}
+EOF
+log "User profile registration fields updated."
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 4. Create realm-level roles (idempotent)
@@ -162,6 +256,46 @@ EOF
     log "Role '${ROLE_NAME}' already exists — skipping."
   fi
 done
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4b. Create a dedicated self-registration group and map CLIENT to it
+#
+#     The custom Keycloak listener only adds self-registered users to this
+#     group on REGISTER. The group then contributes the CLIENT realm role.
+#     This keeps the scope narrower than a global default role/default group.
+# ─────────────────────────────────────────────────────────────────────────────
+get_group_uuid() {
+  local group_name="$1"
+  kc GET "realms/${REALM}/groups?search=${group_name}" \
+    | jq -r --arg name "$group_name" 'first(.[]? | select(.name==$name) | .id) // empty'
+}
+
+log "Checking group '${SELF_REGISTERED_CLIENT_GROUP}' ..."
+SELF_REGISTERED_CLIENT_GROUP_ID=$(get_group_uuid "${SELF_REGISTERED_CLIENT_GROUP}")
+if [[ -z "$SELF_REGISTERED_CLIENT_GROUP_ID" ]]; then
+  log "Creating group '${SELF_REGISTERED_CLIENT_GROUP}' ..."
+  kc POST "realms/${REALM}/groups" -d @- <<EOF
+{
+  "name": "${SELF_REGISTERED_CLIENT_GROUP}"
+}
+EOF
+  SELF_REGISTERED_CLIENT_GROUP_ID=$(get_group_uuid "${SELF_REGISTERED_CLIENT_GROUP}")
+  log "Group '${SELF_REGISTERED_CLIENT_GROUP}' created (id=${SELF_REGISTERED_CLIENT_GROUP_ID})."
+else
+  log "Group '${SELF_REGISTERED_CLIENT_GROUP}' already exists (id=${SELF_REGISTERED_CLIENT_GROUP_ID}) — skipping."
+fi
+
+log "Ensuring group '${SELF_REGISTERED_CLIENT_GROUP}' carries CLIENT ..."
+GROUP_HAS_CLIENT_ROLE=$(kc GET "realms/${REALM}/groups/${SELF_REGISTERED_CLIENT_GROUP_ID}/role-mappings/realm" \
+  | jq -r '.[] | select(.name=="CLIENT") | .name' || true)
+if [[ -z "$GROUP_HAS_CLIENT_ROLE" ]]; then
+  CLIENT_ROLE_REP=$(kc GET "realms/${REALM}/roles/CLIENT")
+  kc POST "realms/${REALM}/groups/${SELF_REGISTERED_CLIENT_GROUP_ID}/role-mappings/realm" \
+    -d "[${CLIENT_ROLE_REP}]" > /dev/null
+  log "  CLIENT mapped to group '${SELF_REGISTERED_CLIENT_GROUP}'."
+else
+  log "  CLIENT already mapped to group '${SELF_REGISTERED_CLIENT_GROUP}' — skipping."
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 5. Create a shared client scope that injects the 'dealership' audience
@@ -258,6 +392,15 @@ assign_audience_scope() {
 # ─────────────────────────────────────────────────────────────────────────────
 BFF_CLIENT_ID="dealership-bff"
 BFF_CLIENT_SECRET="dealership-bff-secret"
+BFF_FRONTEND_PRIMARY_URL="${BFF_FRONTEND_PRIMARY_URL:-https://app.localhost:4443}"
+BFF_FRONTEND_LOOPBACK="http://127.0.0.1:3000"
+BFF_FRONTEND_LEGACY_LOCALHOST="http://localhost:3000"
+BFF_PUBLIC_API_URL="${BFF_PUBLIC_API_URL:-https://api.localhost:4443}"
+# Keycloak expects `post.logout.redirect.uris` as either:
+#  - a Keycloak-formatted list string, or
+#  - "+" to reuse standard redirectUris.
+# Using "+" avoids format drift and keeps logout allow-list aligned with redirectUris.
+BFF_POST_LOGOUT_REDIRECT_URIS="+"
 log "Checking client '${BFF_CLIENT_ID}' ..."
 BFF_UUID=$(get_client_uuid "$BFF_CLIENT_ID")
 
@@ -273,11 +416,26 @@ if [[ -z "$BFF_UUID" ]]; then
   "standardFlowEnabled": true,
   "directAccessGrantsEnabled": false,
   "serviceAccountsEnabled": false,
+  "rootUrl": "${BFF_FRONTEND_PRIMARY_URL}",
+  "baseUrl": "${BFF_FRONTEND_PRIMARY_URL}",
+  "adminUrl": "${BFF_FRONTEND_PRIMARY_URL}",
   "redirectUris": [
+    "${BFF_FRONTEND_PRIMARY_URL}/*",
+    "${BFF_PUBLIC_API_URL}/*",
+    "${BFF_FRONTEND_LEGACY_LOCALHOST}/*",
+    "${BFF_FRONTEND_LOOPBACK}/*",
     "http://localhost:*",
     "http://127.0.0.1:*"
   ],
-  "webOrigins": ["+"]
+  "webOrigins": [
+    "${BFF_FRONTEND_PRIMARY_URL}",
+    "${BFF_PUBLIC_API_URL}",
+    "${BFF_FRONTEND_LEGACY_LOCALHOST}",
+    "${BFF_FRONTEND_LOOPBACK}"
+  ],
+  "attributes": {
+    "post.logout.redirect.uris": "${BFF_POST_LOGOUT_REDIRECT_URIS}"
+  }
 }
 EOF
   BFF_UUID=$(get_client_uuid "$BFF_CLIENT_ID")
@@ -286,12 +444,38 @@ else
   log "Client '${BFF_CLIENT_ID}' already exists (uuid=${BFF_UUID}) — skipping."
 fi
 
-# Always enforce the known secret so local dev works without manual copy-paste.
-log "Setting secret for '${BFF_CLIENT_ID}' ..."
+# Always enforce secret and browser-flow redirect configuration for local frontend.
+log "Setting OIDC settings for '${BFF_CLIENT_ID}' ..."
 kc PUT "realms/${REALM}/clients/${BFF_UUID}" -d @- <<EOF > /dev/null
-{"secret": "${BFF_CLIENT_SECRET}"}
+{
+  "secret": "${BFF_CLIENT_SECRET}",
+  "rootUrl": "${BFF_FRONTEND_PRIMARY_URL}",
+  "baseUrl": "${BFF_FRONTEND_PRIMARY_URL}",
+  "adminUrl": "${BFF_FRONTEND_PRIMARY_URL}",
+  "publicClient": false,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": [
+    "${BFF_FRONTEND_PRIMARY_URL}/*",
+    "${BFF_PUBLIC_API_URL}/*",
+    "${BFF_FRONTEND_LEGACY_LOCALHOST}/*",
+    "${BFF_FRONTEND_LOOPBACK}/*",
+    "http://localhost:*",
+    "http://127.0.0.1:*"
+  ],
+  "webOrigins": [
+    "${BFF_FRONTEND_PRIMARY_URL}",
+    "${BFF_PUBLIC_API_URL}",
+    "${BFF_FRONTEND_LEGACY_LOCALHOST}",
+    "${BFF_FRONTEND_LOOPBACK}"
+  ],
+  "attributes": {
+    "post.logout.redirect.uris": "${BFF_POST_LOGOUT_REDIRECT_URIS}"
+  }
+}
 EOF
-log "Secret set."
+log "OIDC settings enforced."
 
 log "Assigning audience scope to '${BFF_CLIENT_ID}' ..."
 assign_audience_scope "$BFF_UUID"
@@ -363,7 +547,73 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 8. Create test users  (idempotent)
+# 8. Create the lambda client: lambda-update-car-status (idempotent)
+#
+#    Used by lambda-update-car-status for machine-to-machine (M2M) token
+#    acquisition via Client Credentials Flow.
+# ─────────────────────────────────────────────────────────────────────────────
+LAMBDA_CLIENT_ID="lambda-update-car-status"
+LAMBDA_CLIENT_SECRET="lambda-update-car-status-secret"
+log "Checking client '${LAMBDA_CLIENT_ID}' ..."
+LAMBDA_UUID=$(get_client_uuid "$LAMBDA_CLIENT_ID")
+
+if [[ -z "$LAMBDA_UUID" ]]; then
+  log "Creating client '${LAMBDA_CLIENT_ID}' ..."
+  kc POST "realms/${REALM}/clients" -d @- <<EOF
+{
+  "clientId": "${LAMBDA_CLIENT_ID}",
+  "name": "Lambda Update Car Status",
+  "description": "Service account used by lambda-update-car-status",
+  "enabled": true,
+  "publicClient": false,
+  "standardFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": true
+}
+EOF
+  LAMBDA_UUID=$(get_client_uuid "$LAMBDA_CLIENT_ID")
+  log "Client '${LAMBDA_CLIENT_ID}' created (uuid=${LAMBDA_UUID})."
+else
+  log "Client '${LAMBDA_CLIENT_ID}' already exists (uuid=${LAMBDA_UUID}) — skipping."
+fi
+
+log "Setting secret for '${LAMBDA_CLIENT_ID}' ..."
+kc PUT "realms/${REALM}/clients/${LAMBDA_UUID}" -d @- <<EOF > /dev/null
+{"secret": "${LAMBDA_CLIENT_SECRET}"}
+EOF
+log "Secret set."
+
+log "Assigning audience scope to '${LAMBDA_CLIENT_ID}' ..."
+assign_audience_scope "$LAMBDA_UUID"
+
+LAMBDA_SA_USER_ID=$(kc GET "realms/${REALM}/clients/${LAMBDA_UUID}/service-account-user" \
+  | jq -r '.id')
+
+log "Assigning SYSTEM role to '${LAMBDA_CLIENT_ID}' service account ..."
+LAMBDA_SYSTEM_ASSIGNED=$(kc GET "realms/${REALM}/users/${LAMBDA_SA_USER_ID}/role-mappings/realm" \
+  | jq -r '.[] | select(.name=="SYSTEM") | .name' || true)
+if [[ -z "$LAMBDA_SYSTEM_ASSIGNED" ]]; then
+  kc POST "realms/${REALM}/users/${LAMBDA_SA_USER_ID}/role-mappings/realm" \
+    -d "[${SYSTEM_ROLE}]" > /dev/null
+  log "  SYSTEM role assigned to service account."
+else
+  log "  SYSTEM role already assigned to service account — skipping."
+fi
+
+log "Assigning STAFF role to '${LAMBDA_CLIENT_ID}' service account ..."
+LAMBDA_STAFF_ASSIGNED=$(kc GET "realms/${REALM}/users/${LAMBDA_SA_USER_ID}/role-mappings/realm" \
+  | jq -r '.[] | select(.name=="STAFF") | .name' || true)
+if [[ -z "$LAMBDA_STAFF_ASSIGNED" ]]; then
+  STAFF_ROLE=$(kc GET "realms/${REALM}/roles/STAFF")
+  kc POST "realms/${REALM}/users/${LAMBDA_SA_USER_ID}/role-mappings/realm" \
+    -d "[${STAFF_ROLE}]" > /dev/null
+  log "  STAFF role assigned to service account."
+else
+  log "  STAFF role already assigned to service account — skipping."
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Create test users  (idempotent)
 #
 #    One user per role, with predictable credentials for local development.
 #    Passwords are set as non-temporary so no password-change prompt appears
@@ -453,6 +703,7 @@ log ""
 log "  Clients    :"
 log "    dealership-bff    — Authorization Code Flow (confidential, secret=${BFF_CLIENT_SECRET})"
 log "    dealership-system — Client Credentials Flow (service account, secret=${SYS_CLIENT_SECRET})"
+log "    lambda-update-car-status — Client Credentials Flow (service account, secret=${LAMBDA_CLIENT_SECRET})"
 log ""
 log "  To get a token for manual testing:"
 log "    curl -s '${KEYCLOAK_URL}/realms/${REALM}/protocol/openid-connect/token' \\"

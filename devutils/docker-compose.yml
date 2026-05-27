@@ -15,7 +15,7 @@ services:
       - PERSISTENCE=1
       - ECS_REMOVE_CONTAINERS=0
       - GATEWAY_LISTEN=0.0.0.0:4566,0.0.0.0:8085,0.0.0.0:8086,0.0.0.0:8087
-      - SMTP_HOST=smtp4dev
+      - SMTP_HOST=smtp4dev-ai
       - SMTP_PORT=25
       - SMTP_USERNAME=
       - SMTP_PASSWORD=
@@ -55,7 +55,7 @@ services:
       - ServerOptions__Urls=http://*:80
 
       #Specifies the server hostname. Used in auto-generated TLS certificate if enabled.
-      - ServerOptions__HostName=smtp4dev
+      - ServerOptions__HostName=smtp4dev-ai
     networks:
       - dealership-ai-network
   newrelic-infra:
@@ -102,7 +102,10 @@ services:
   # Admin console: http://localhost:8180/admin  (admin / admin)
   keycloak:
     container_name: keycloak
-    image: quay.io/keycloak/keycloak:26.2
+    build:
+      context: .
+      dockerfile: ./keycloak/Dockerfile
+    image: dealership-ai-keycloak:local
     command: start-dev
     environment:
       # Backing database
@@ -116,8 +119,11 @@ services:
       # Allow plain HTTP and any hostname in dev mode
       KC_HOSTNAME_STRICT: "false"
       KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
     ports:
       - "8180:8080"
+    volumes:
+      - "./keycloak/themes:/opt/keycloak/themes"
     depends_on:
       postgres-keycloak:
         condition: service_healthy
@@ -130,11 +136,34 @@ services:
     networks:
       - dealership-ai-network
 
+  caddy:
+    container_name: caddy
+    image: caddy:2.10.2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "4443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "api-dealership-ai.elb.localhost.localstack.cloud:host-gateway"
+    volumes:
+      - "./caddy/Caddyfile:/etc/caddy/Caddyfile:ro"
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - keycloak
+    networks:
+      - dealership-ai-network
+
 volumes:
   cache:
   smtp4dev-ai-data:
     driver: local
   postgres-keycloak-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
     driver: local
 
 networks:

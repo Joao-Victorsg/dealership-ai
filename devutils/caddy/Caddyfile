@@ -1,0 +1,24 @@
+{
+    local_certs
+}
+
+# Frontend and BFF share the same public host so SESSION cookies stay host-scoped.
+app.localhost {
+    tls internal
+
+    @bff path /oauth2/* /login/* /api/v1/* /actuator/* /swagger-ui /swagger-ui/* /v3/api-docs /v3/api-docs/* /static/*
+    reverse_proxy @bff api-dealership-ai.elb.localhost.localstack.cloud:8083
+
+    reverse_proxy api-dealership-ai.elb.localhost.localstack.cloud:3000
+}
+
+# Optional direct API access (Swagger/manual calls).
+api.localhost {
+    tls internal
+    reverse_proxy api-dealership-ai.elb.localhost.localstack.cloud:8083
+}
+
+auth.localhost {
+    tls internal
+    reverse_proxy keycloak:8080
+}
