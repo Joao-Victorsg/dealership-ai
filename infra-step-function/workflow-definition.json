@@ -1,0 +1,46 @@
+{
+  "Comment": "Invoice workflow for dealership-ai",
+  "StartAt": "GenerateInvoice",
+  "States": {
+    "GenerateInvoice": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${invoice_processor_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Next": "SendEmail"
+    },
+    "SendEmail": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${send_email_lambda_arn}",
+        "Payload.$": "$"
+      },
+      "OutputPath": "$.Payload",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "States.ALL"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "End": true
+    }
+  }
+}

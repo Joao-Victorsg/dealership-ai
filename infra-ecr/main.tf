@@ -53,3 +53,17 @@ resource "aws_ecr_repository" "dealership_bff" {
     Project = "dealership-ai"
   }
 }
+
+resource "aws_ecr_repository" "dealership_web" {
+  name                 = "joaovictorsg/dealership-web"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name    = "dealership-web"
+    Project = "dealership-ai"
+  }
+}

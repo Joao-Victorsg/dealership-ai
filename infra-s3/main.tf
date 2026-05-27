@@ -8,6 +8,16 @@ resource "aws_s3_bucket" "car_images" {
   }
 }
 
+resource "aws_s3_bucket" "invoices" {
+  bucket = "invoices-bucket"
+
+  tags = {
+    Name        = "invoices-bucket"
+    Project     = "dealership-ai"
+    Environment = "dev"
+  }
+}
+
 # Protect against accidental deletion of image data
 resource "aws_s3_bucket_versioning" "car_images" {
   bucket = aws_s3_bucket.car_images.id
@@ -17,9 +27,26 @@ resource "aws_s3_bucket_versioning" "car_images" {
   }
 }
 
+resource "aws_s3_bucket_versioning" "invoices" {
+  bucket = aws_s3_bucket.invoices.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # All objects are accessed exclusively via presigned URLs — public access must be blocked
 resource "aws_s3_bucket_public_access_block" "car_images" {
   bucket = aws_s3_bucket.car_images.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_public_access_block" "invoices" {
+  bucket = aws_s3_bucket.invoices.id
 
   block_public_acls       = true
   block_public_policy     = true
