@@ -1,0 +1,27 @@
+# Go
+bin/
+build/
+coverage.out
+coverage/
+*.out
+*.test
+vendor/
+# Lambda artifacts
+bootstrap
+lambda.zip
+# Env and logs
+.env*
+*.log
+# Terraform
+.terraform/
+*.tfstate*
+*.tfvars
+*.tfplan
+.terraform.lock.hcl
+# OS/Editor
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+.vscode/
+.idea/

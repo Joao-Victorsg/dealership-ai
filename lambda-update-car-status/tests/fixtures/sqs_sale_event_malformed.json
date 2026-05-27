@@ -1,0 +1,10 @@
+{
+  "Records": [
+    {
+      "messageId": "msg-malformed",
+      "body": "{\"SaleId\":\"\",\"CarId\":\"car-456\"}",
+      "eventSource": "aws:sqs",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

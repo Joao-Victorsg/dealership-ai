@@ -1,0 +1,28 @@
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+      - name: Test race
+        run: go test ./... -race
+      - name: Coverage
+        run: |
+          go test ./... -coverprofile=coverage.out
+          go tool cover -func=coverage.out | tail -n 1
+          total=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print substr($3, 1, length($3)-1)}')
+          awk -v c="$total" 'BEGIN { if (c+0 < 90) exit 1 }'
+      - name: Vulnerability scan
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

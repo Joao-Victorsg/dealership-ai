@@ -1,0 +1,16 @@
+{
+  "Records": [
+    {
+      "messageId": "msg-dup-1",
+      "body": "{\"SaleId\":\"sale-dup\",\"CarId\":\"car-dup\"}",
+      "eventSource": "aws:sqs",
+      "awsRegion": "us-east-1"
+    },
+    {
+      "messageId": "msg-dup-2",
+      "body": "{\"SaleId\":\"sale-dup\",\"CarId\":\"car-dup\"}",
+      "eventSource": "aws:sqs",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

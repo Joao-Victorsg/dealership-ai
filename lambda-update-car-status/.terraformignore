@@ -1,0 +1,12 @@
+.git/
+.github/
+.specify/
+.idea/
+.vscode/
+**/.terraform/*
+**/*.tfstate*
+**/*.tfvars
+**/*.tfplan
+**/.env*
+**/*.log
+

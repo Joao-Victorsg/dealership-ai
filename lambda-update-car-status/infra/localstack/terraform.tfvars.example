@@ -1,0 +1,20 @@
+environment                      = "local"
+owner                            = "platform-team"
+cost_center                      = "cc-001"
+data_classification              = "internal"
+car_api_base_url                 = "http://host.docker.internal:8080"
+car_api_timeout_ms               = 2000
+keycloak_token_url               = "http://keycloak:8080/realms/dealership/protocol/openid-connect/token"
+keycloak_client_id               = "lambda-update-car-status"
+# Raw Keycloak client secret. Terraform wraps it as {"client_secret":"..."} in Secrets Manager.
+keycloak_client_secret           = "lambda-update-car-status-secret"
+keycloak_refresh_skew_seconds    = 30
+breaker_max_requests             = 3
+breaker_interval_ms              = 10000
+breaker_timeout_ms               = 5000
+breaker_ready_to_trip_failures   = 5
+log_level                        = "info"
+new_relic_extension_layer_arn    = ""
+new_relic_account_id             = "1234567"
+new_relic_trusted_account_key    = "replace-me"
+new_relic_license_key_secret_arn = "arn:aws:secretsmanager:us-east-1:000000000000:secret:newrelic-license"
